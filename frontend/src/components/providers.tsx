@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState, useEffect, useCallback } from "react";
 import { AuthContext } from "@/lib/auth";
 import type { User } from "@/lib/types";
+import axios from "axios";
 import api from "@/lib/api";
 import { Toaster } from "sonner";
 
@@ -26,6 +27,17 @@ export function Providers({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => { fetchUser(); }, [fetchUser]);
+
+  useEffect(() => {
+    const id = setInterval(async () => {
+      try {
+        await axios.post("/api/auth/refresh", {}, { withCredentials: true });
+      } catch {
+        // refresh failed — reactive interceptor will handle the next 401
+      }
+    }, 14 * 60 * 1000);
+    return () => clearInterval(id);
+  }, []);
 
   const login = async (email: string, password: string, mfaCode?: string) => {
     await api.post("/auth/login", { email, password, mfa_code: mfaCode });
