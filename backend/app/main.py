@@ -1,6 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.openapi.docs import get_redoc_html
 from starlette.middleware.sessions import SessionMiddleware
+from starlette.responses import HTMLResponse
 from app.config import settings
 from app.middleware.audit import AuditMiddleware
 from app.routers import auth, incidents, tasks, documents, scorecard, communications, ai, knowledge, admin, audit, ransomware, v1
@@ -33,7 +35,7 @@ Create API keys in **Admin → API Keys**.
     """,
     version="1.0.0",
     docs_url="/docs",
-    redoc_url="/redoc",
+    redoc_url=None,
     openapi_tags=[
         {"name": "auth", "description": "Authentication (login, SSO, MFA, token refresh)"},
         {"name": "incidents", "description": "Incident management and War Room"},
@@ -79,6 +81,15 @@ app.include_router(admin.router)
 app.include_router(audit.router)
 app.include_router(v1.router)
 app.include_router(task_templates.router)
+
+
+@app.get("/redoc", include_in_schema=False)
+async def redoc_html() -> HTMLResponse:
+    return get_redoc_html(
+        openapi_url="/openapi.json",
+        title="IR Command Center - ReDoc",
+        redoc_js_url="https://cdn.jsdelivr.net/npm/redoc@2.1.5/bundles/redoc.standalone.js",
+    )
 
 
 @app.get("/health", tags=["health"])

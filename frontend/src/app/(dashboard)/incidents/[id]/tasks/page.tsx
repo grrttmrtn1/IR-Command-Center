@@ -6,13 +6,15 @@ import { useState } from "react";
 import {
   DndContext,
   DragOverlay,
-  closestCorners,
+  pointerWithin,
+  rectIntersection,
   PointerSensor,
   useSensor,
   useSensors,
   useDroppable,
   type DragEndEvent,
   type DragStartEvent,
+  type CollisionDetection,
 } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -21,6 +23,11 @@ import type { Task, TaskStatus, Priority } from "@/lib/types";
 import { PRIORITY_COLORS } from "@/lib/utils";
 import { Plus, Sparkles, GripVertical, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+
+const kanbanCollision: CollisionDetection = (args) => {
+  const hits = pointerWithin(args);
+  return hits.length > 0 ? hits : rectIntersection(args);
+};
 
 const COLUMNS: { id: TaskStatus; label: string; color: string }[] = [
   { id: "BACKLOG", label: "Backlog", color: "bg-slate-100 dark:bg-slate-900/50" },
@@ -212,7 +219,7 @@ export default function IncidentTasksPage() {
         </button>
       </div>
 
-      <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+      <DndContext sensors={sensors} collisionDetection={kanbanCollision} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
         <div className="flex gap-4 overflow-x-auto pb-4">
           {COLUMNS.map((col) => (
             <KanbanColumn
