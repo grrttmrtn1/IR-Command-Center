@@ -1,0 +1,94 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Attach: FastAPI (Docker)",
+      "type": "debugpy",
+      "request": "attach",
+      "preLaunchTask": "Docker: Start Debug Stack",
+      "connect": {
+        "host": "localhost",
+        "port": 5678
+      },
+      "pathMappings": [
+        {
+          "localRoot": "${workspaceFolder}/backend/app",
+          "remoteRoot": "/app/app"
+        }
+      ],
+      "justMyCode": false
+    },
+    {
+      "name": "Attach: Next.js (Docker)",
+      "type": "node",
+      "request": "attach",
+      "preLaunchTask": "Docker: Start Debug Stack",
+      "port": 9229,
+      "address": "localhost",
+      "localRoot": "${workspaceFolder}/frontend",
+      "remoteRoot": "/app",
+      "restart": true,
+      "sourceMaps": true,
+      "skipFiles": ["<node_internals>/**", "${workspaceFolder}/frontend/node_modules/**"]
+    },
+    {
+      "name": "Launch: Chrome (Frontend)",
+      "type": "chrome",
+      "request": "launch",
+      "url": "http://localhost",
+      "webRoot": "${workspaceFolder}/frontend/src",
+      "sourceMapPathOverrides": {
+        "/_next/*": "${workspaceFolder}/frontend/.next/*",
+        "webpack://_N_E/*": "${workspaceFolder}/frontend/*"
+      }
+    },
+    {
+      "name": "FastAPI: Local (venv)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "uvicorn",
+      "args": ["app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"],
+      "preLaunchTask": "Docker: Start DB+Redis",
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}/backend",
+      "python": "${workspaceFolder}/backend/.venv/bin/python",
+      "jinja": true,
+      "justMyCode": false,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/backend",
+        "DATABASE_URL": "postgresql+asyncpg://ircc:devpassword@localhost:5432/ircc",
+        "REDIS_URL": "redis://localhost:6379/0",
+        "SECRET_KEY": "dev-secret-key-change-in-production-minimum-32-chars",
+        "ENCRYPTION_KEY": "dev-encrypt-key-change-in-production-32c",
+        "CORS_ORIGINS": "http://localhost,http://localhost:3000",
+        "UPLOAD_DIR": "/tmp/ircc-uploads",
+        "DEBUG": "true"
+      }
+    },
+    {
+      "name": "Python: Current File (venv)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${file}",
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}/backend",
+      "python": "${workspaceFolder}/backend/.venv/bin/python",
+      "justMyCode": false,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/backend"
+      }
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Debug: FastAPI + Chrome",
+      "configurations": ["Attach: FastAPI (Docker)", "Launch: Chrome (Frontend)"],
+      "stopAll": true
+    },
+    {
+      "name": "Debug: Full Stack",
+      "configurations": ["Attach: FastAPI (Docker)", "Attach: Next.js (Docker)", "Launch: Chrome (Frontend)"],
+      "stopAll": true
+    }
+  ]
+}

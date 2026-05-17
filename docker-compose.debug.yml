@@ -1,0 +1,12 @@
+services:
+  backend:
+    ports:
+      - "5678:5678"
+    # debugpy replaces --reload; hot reload is disabled while debugging
+    command: python -m debugpy --listen 0.0.0.0:5678 -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+
+  frontend:
+    environment:
+      - NODE_OPTIONS=--inspect=0.0.0.0:9229
+    ports:
+      - "9229:9229"
