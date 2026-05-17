@@ -227,7 +227,9 @@ export default function AdminUsersPage() {
                 </td>
                 <td className="px-5 py-3">
                   {user.sso_provider ? (
-                    <Shield className={`h-4 w-4 ${user.mfa_enabled ? "text-green-500" : "text-muted-foreground"}`} title={user.mfa_enabled ? "MFA enabled" : "MFA not enabled"} />
+                    <span title={user.mfa_enabled ? "MFA enabled" : "MFA not enabled"}>
+                      <Shield className={`h-4 w-4 ${user.mfa_enabled ? "text-green-500" : "text-muted-foreground"}`} />
+                    </span>
                   ) : (
                     <span className="text-xs text-muted-foreground" title="MFA via TOTP is available for SSO accounts only">—</span>
                   )}

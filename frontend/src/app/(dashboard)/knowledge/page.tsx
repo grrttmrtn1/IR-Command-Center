@@ -18,7 +18,7 @@ export default function KnowledgePage() {
   });
   const [newSystem, setNewSystem] = useState("");
   const [newObligation, setNewObligation] = useState("");
-  const [contactForm, setContactForm] = useState({ name: "", role: "", email: "", phone: "", organization: "", type: "INTERNAL" as const });
+  const [contactForm, setContactForm] = useState<{ name: string; role: string; email: string; phone: string; organization: string; type: "INTERNAL" | "EXTERNAL" | "VENDOR" }>({ name: "", role: "", email: "", phone: "", organization: "", type: "INTERNAL" });
   const [showContactForm, setShowContactForm] = useState(false);
 
   const { data: knowledge } = useQuery({

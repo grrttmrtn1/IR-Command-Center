@@ -48,7 +48,7 @@ function FrameworkCard({ fwKey, fw }: { fwKey: string; fw: FrameworkCoverage }) 
   const allCategories = [...fw.covered, ...fw.uncovered].sort((a, b) =>
     a.function.localeCompare(b.function) || a.id.localeCompare(b.id)
   );
-  const functions = [...new Set(allCategories.map((c) => c.function))];
+  const functions = Array.from(new Set(allCategories.map((c) => c.function)));
 
   return (
     <div className={`rounded-xl border border-border bg-card ring-2 ${FW_RING[fwKey] ?? "ring-border"} overflow-hidden`}>

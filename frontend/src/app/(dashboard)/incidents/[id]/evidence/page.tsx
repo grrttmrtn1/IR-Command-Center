@@ -118,7 +118,7 @@ export default function EvidencePage() {
                 <p className="text-sm font-medium">{ev.title}</p>
                 <div className="flex items-center gap-3 mt-1">
                   <span className="text-xs text-muted-foreground">{ev.mime_type}</span>
-                  <span className="text-xs text-muted-foreground">{formatBytes(ev.file_size)}</span>
+                  <span className="text-xs text-muted-foreground">{ev.file_size != null ? formatBytes(ev.file_size) : "—"}</span>
                   <span className="text-xs text-muted-foreground">{new Date(ev.collected_at).toLocaleString()}</span>
                 </div>
                 {ev.description && <p className="text-xs text-muted-foreground mt-1 line-clamp-1">{ev.description}</p>}

@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import {
   Shield, AlertTriangle, CheckSquare, FileText, MessageSquare,
   Brain, BookOpen, Settings, Users, Key, ClipboardList,
-  Activity, Database, BarChart3, LogOut, ChevronRight, ListTodo, Building2,
+  Activity, Database, BarChart3, LogOut, ListTodo, Building2,
   ShieldCheck, Mail,
 } from "lucide-react";
 import { NotificationBell } from "@/components/NotificationBell";
@@ -37,6 +37,15 @@ const adminItems = [
   { href: "/admin/backup", label: "Backup", icon: Database, minRole: "SUPER_ADMIN" },
 ];
 
+/* Deterministic avatar color from a character */
+const AVATAR_COLORS = [
+  "#3b82f6", "#8b5cf6", "#10b981", "#f59e0b",
+  "#ef4444", "#06b6d4", "#ec4899", "#6366f1",
+];
+function avatarColor(char: string) {
+  return AVATAR_COLORS[char.charCodeAt(0) % AVATAR_COLORS.length];
+}
+
 export function Sidebar() {
   const pathname = usePathname();
   const { user, logout } = useAuth();
@@ -48,30 +57,43 @@ export function Sidebar() {
       <Link
         href={href}
         className={cn(
-          "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+          "relative flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150 overflow-hidden",
           active
-            ? "bg-sidebar-primary text-sidebar-primary-foreground"
-            : "text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent"
+            ? "bg-white/[0.07] text-sidebar-foreground"
+            : "text-sidebar-foreground/55 hover:text-sidebar-foreground hover:bg-white/[0.05]"
         )}
       >
-        <Icon className="h-4 w-4 shrink-0" />
+        {active && (
+          <span
+            className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-r-full bg-sidebar-primary"
+            aria-hidden="true"
+          />
+        )}
+        <Icon
+          className={cn(
+            "h-4 w-4 shrink-0 transition-colors duration-150",
+            active ? "text-sidebar-primary" : ""
+          )}
+        />
         {label}
-        {active && <ChevronRight className="h-3 w-3 ml-auto" />}
       </Link>
     );
   }
 
+  const initial = (user?.name?.[0] ?? user?.email?.[0] ?? "U").toUpperCase();
+  const badgeColor = avatarColor(initial);
+
   return (
-    <div className="w-64 bg-sidebar flex flex-col h-screen sticky top-0">
+    <div className="w-64 flex flex-col h-screen sticky top-0 z-10" style={{ background: "hsl(var(--sidebar-background))" }}>
       {/* Logo */}
       <div className="px-4 py-4 border-b border-sidebar-border">
-        <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600 shrink-0">
-            <Shield className="h-4 w-4 text-white" />
+        <div className="flex items-center gap-2.5">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg shrink-0 bg-gradient-to-br from-blue-500 to-blue-700 shadow-md shadow-blue-900/40">
+            <Shield className="h-4 w-4 text-white drop-shadow-sm" />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-bold text-sidebar-foreground">IR Command</p>
-            <p className="text-xs text-sidebar-foreground/50">Center</p>
+            <p className="text-sm font-bold text-sidebar-foreground tracking-tight leading-none">IR Command</p>
+            <p className="text-[10px] text-sidebar-foreground/40 uppercase tracking-widest font-medium mt-0.5">Center</p>
           </div>
           <GlobalSearch />
           <NotificationBell userId={user?.id ?? ""} />
@@ -79,14 +101,14 @@ export function Sidebar() {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
+      <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-0.5">
         {navItems.map((item) => (
           <NavLink key={item.href} {...item} />
         ))}
 
         {hasRole(user, "ADMIN") && (
-          <div className="pt-4 mt-4 border-t border-sidebar-border">
-            <p className="px-3 mb-2 text-xs font-semibold text-sidebar-foreground/40 uppercase tracking-wider">
+          <div className="pt-4 mt-3 border-t border-sidebar-border">
+            <p className="px-3 mb-1.5 text-[10px] font-semibold text-sidebar-foreground/30 uppercase tracking-widest">
               Administration
             </p>
             {adminItems.map((item) => (
@@ -95,10 +117,10 @@ export function Sidebar() {
           </div>
         )}
 
-        <div className="pt-4 mt-4 border-t border-sidebar-border">
+        <div className="pt-4 mt-3 border-t border-sidebar-border">
           <Link
             href="/api-docs"
-            className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
+            className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-sidebar-foreground/55 hover:text-sidebar-foreground hover:bg-white/[0.05] transition-all duration-150"
           >
             <Database className="h-4 w-4 shrink-0" />
             API Docs
@@ -109,17 +131,22 @@ export function Sidebar() {
       {/* User */}
       <div className="px-4 py-4 border-t border-sidebar-border">
         <div className="flex items-center gap-3 mb-3">
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-sidebar-accent text-sidebar-foreground text-sm font-semibold">
-            {user?.name?.[0] ?? user?.email[0].toUpperCase()}
+          <div
+            className="flex h-8 w-8 items-center justify-center rounded-full text-white text-sm font-semibold shrink-0 shadow-sm"
+            style={{ backgroundColor: badgeColor }}
+          >
+            {initial}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-sidebar-foreground truncate">{user?.name ?? user?.email}</p>
-            <p className="text-xs text-sidebar-foreground/50">{user?.role?.replace("_", " ")}</p>
+            <p className="text-sm font-medium text-sidebar-foreground truncate leading-tight">
+              {user?.name ?? user?.email}
+            </p>
+            <p className="text-[11px] text-sidebar-foreground/40 mt-0.5">{user?.role?.replace("_", " ")}</p>
           </div>
         </div>
         <button
           onClick={logout}
-          className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
+          className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-sidebar-foreground/55 hover:text-sidebar-foreground hover:bg-white/[0.05] transition-all duration-150"
         >
           <LogOut className="h-4 w-4" />
           Sign Out
