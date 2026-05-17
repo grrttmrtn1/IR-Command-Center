@@ -21,7 +21,7 @@ const INCIDENT_TYPES = [
 export default function NewIncidentPage() {
   const router = useRouter();
   const qc = useQueryClient();
-  const [form, setForm] = useState({ title: "", description: "", incident_type: "OTHER", severity: "MEDIUM" });
+  const [form, setForm] = useState({ title: "", description: "", incident_type: "OTHER", severity: "MEDIUM", is_exercise: false });
 
   const mutation = useMutation({
     mutationFn: (data: typeof form) => api.post<Incident>("/incidents", data).then((r) => r.data),
@@ -101,6 +101,24 @@ export default function NewIncidentPage() {
             <p className="text-xs text-orange-600 dark:text-orange-500 mt-1">Ransomware-specific tasks will be added automatically. Navigate to the Ransomware Decision Support tool after declaring this incident.</p>
           </div>
         )}
+
+        {/* Exercise mode */}
+        <div className={`rounded-lg border p-4 transition-colors ${form.is_exercise ? "bg-orange-50 dark:bg-orange-950/30 border-orange-300 dark:border-orange-700" : "border-border bg-muted/30"}`}>
+          <label className="flex items-start gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={form.is_exercise}
+              onChange={(e) => setForm({ ...form, is_exercise: e.target.checked })}
+              className="mt-0.5 rounded"
+            />
+            <div>
+              <p className="text-sm font-medium">🧪 Tabletop Exercise</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Mark this as a simulated exercise. Exercise incidents are excluded from MTTD/MTTR metrics and clearly labelled throughout the UI.
+              </p>
+            </div>
+          </label>
+        </div>
 
         <div className="flex gap-3 pt-2">
           <button

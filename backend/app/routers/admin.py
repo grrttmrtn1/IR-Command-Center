@@ -1,4 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException
+import asyncio
+import os
+import urllib.parse
+from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from passlib.context import CryptContext
@@ -169,3 +172,71 @@ async def delete_sso_config(config_id: str, user: User = Depends(require_role(Us
         raise HTTPException(status_code=404, detail="SSO config not found")
     await db.delete(config)
     await db.commit()
+
+
+# --- Database Backup ---
+
+def _parse_db_url(db_url: str) -> dict[str, str]:
+    """Extract pg_dump connection parameters from the SQLAlchemy URL."""
+    url = db_url.replace("postgresql+asyncpg://", "postgresql://")
+    parsed = urllib.parse.urlparse(url)
+    params: dict[str, str] = {}
+    if parsed.hostname:
+        params["host"] = parsed.hostname
+    if parsed.port:
+        params["port"] = str(parsed.port)
+    if parsed.username:
+        params["user"] = urllib.parse.unquote(parsed.username)
+    if parsed.password:
+        params["password"] = urllib.parse.unquote(parsed.password)
+    # db name: strip leading /
+    params["dbname"] = parsed.path.lstrip("/")
+    return params
+
+
+@router.get("/backup/download")
+async def download_backup(user: User = Depends(require_role(UserRole.SUPER_ADMIN)), db: AsyncSession = Depends(get_db)):
+    """Stream a pg_dump of the database as a downloadable SQL file. SUPER_ADMIN only."""
+    from app.config import settings
+    from datetime import datetime, timezone
+    from app.models.audit import AuditLog
+    audit_entry = AuditLog(user_id=user.id, action="backup:download", resource="database", resource_id="*")
+    db.add(audit_entry)
+    await db.commit()
+
+    params = _parse_db_url(settings.database_url)
+
+    env = {"PGPASSWORD": params.get("password", "")}
+    cmd = [
+        "pg_dump",
+        "-h", params.get("host", "localhost"),
+        "-p", params.get("port", "5432"),
+        "-U", params.get("user", "postgres"),
+        "-d", params["dbname"],
+        "--no-password",
+        "--format=plain",
+    ]
+
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            env={**os.environ, **env},
+        )
+        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=120)
+    except FileNotFoundError:
+        raise HTTPException(status_code=503, detail="pg_dump not found on server")
+    except asyncio.TimeoutError:
+        raise HTTPException(status_code=504, detail="pg_dump timed out")
+
+    if proc.returncode != 0:
+        raise HTTPException(status_code=500, detail=f"pg_dump failed: {stderr.decode()[:500]}")
+
+    now = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+    filename = f"ircc-backup-{now}.sql"
+    return Response(
+        content=stdout,
+        media_type="application/octet-stream",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )

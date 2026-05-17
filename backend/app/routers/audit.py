@@ -110,6 +110,9 @@ async def list_audit_logs(
     }
 
 
+_EXPORT_RECORD_LIMIT = 50_000
+
+
 @router.get("/export")
 async def export_audit_logs(
     user: User = Depends(require_role(UserRole.ADMIN)),
@@ -118,7 +121,7 @@ async def export_audit_logs(
     since: datetime | None = None,
     until: datetime | None = None,
 ):
-    query = select(AuditLog).order_by(AuditLog.created_at.desc())
+    query = select(AuditLog).order_by(AuditLog.created_at.desc()).limit(_EXPORT_RECORD_LIMIT)
     if since:
         query = query.where(AuditLog.created_at >= since)
     if until:

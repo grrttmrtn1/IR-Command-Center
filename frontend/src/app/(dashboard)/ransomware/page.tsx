@@ -8,8 +8,16 @@ import { toast } from "sonner";
 import {
   AlertTriangle, Plus, Download, CheckCircle, Clock,
   Trash2, Lightbulb, ChevronRight, ChevronDown,
-  Save, Flag, FileText, X,
+  Save, Flag, FileText, X, Phone, Mail, Building2,
 } from "lucide-react";
+import type { Vendor } from "@/lib/types";
+
+const RETAINER_TYPES: Array<Vendor["vendor_type"]> = ["RANSOM_NEGOTIATOR", "FORENSICS", "LEGAL"];
+const RETAINER_LABELS: Record<string, string> = {
+  RANSOM_NEGOTIATOR: "Ransom Negotiator",
+  FORENSICS: "Forensics",
+  LEGAL: "Legal Counsel",
+};
 
 interface Question {
   id: string;
@@ -95,6 +103,13 @@ export default function RansomwareDecisionPage() {
   const [showNewConfirm, setShowNewConfirm] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const { data: vendors = [] } = useQuery<Vendor[]>({
+    queryKey: ["vendors"],
+    queryFn: () => api.get<Vendor[]>("/vendors").then((r) => r.data),
+  });
+
+  const retainers = vendors.filter((v) => RETAINER_TYPES.includes(v.vendor_type));
 
   const { data: framework } = useQuery<Framework>({
     queryKey: ["ransomware-framework"],
@@ -254,6 +269,68 @@ export default function RansomwareDecisionPage() {
         <p className="text-sm text-amber-800 dark:text-amber-400">
           <strong>Disclaimer:</strong> This tool structures your decision-making process. It does not provide legal, financial, or operational advice. All decisions should be made in consultation with qualified legal counsel, your incident response firm, and your insurance carrier.
         </p>
+      </div>
+
+      {/* Available Retainers */}
+      <div className="rounded-xl border border-border bg-card mb-6 overflow-hidden">
+        <div className="px-5 py-3 border-b border-border bg-muted/30 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Building2 className="h-4 w-4 text-muted-foreground" />
+            <p className="text-sm font-semibold">Available Retainers</p>
+          </div>
+          <a href="/vendors" className="text-xs text-primary hover:underline">Manage vendors →</a>
+        </div>
+        {retainers.length === 0 ? (
+          <div className="px-5 py-6 text-center text-sm text-muted-foreground">
+            No retainer vendors configured. <a href="/vendors" className="text-primary hover:underline">Add vendors</a> to surface them here.
+          </div>
+        ) : (
+          <div className="divide-y divide-border">
+            {retainers.map((v) => (
+              <div key={v.id} className="px-5 py-4 flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="font-medium text-sm">{v.name}</p>
+                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-semibold bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 shrink-0">
+                      {RETAINER_LABELS[v.vendor_type] ?? v.vendor_type}
+                    </span>
+                    {v.expiry_warning && (
+                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-semibold bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 shrink-0">
+                        Expiring soon
+                      </span>
+                    )}
+                    {v.sla_response_hours != null && (
+                      <span className="text-xs text-muted-foreground">SLA: {v.sla_response_hours}h</span>
+                    )}
+                  </div>
+                  {v.primary_contact_name && (
+                    <p className="text-xs text-muted-foreground mt-1">{v.primary_contact_name}</p>
+                  )}
+                </div>
+                <div className="flex flex-col gap-1.5 shrink-0 items-end">
+                  {v.primary_contact_phone && (
+                    <a
+                      href={`tel:${v.primary_contact_phone}`}
+                      className="flex items-center gap-1.5 text-xs text-foreground hover:text-primary transition-colors"
+                    >
+                      <Phone className="h-3 w-3 text-muted-foreground" />
+                      {v.primary_contact_phone}
+                    </a>
+                  )}
+                  {v.primary_contact_email && (
+                    <a
+                      href={`mailto:${v.primary_contact_email}`}
+                      className="flex items-center gap-1.5 text-xs text-foreground hover:text-primary transition-colors"
+                    >
+                      <Mail className="h-3 w-3 text-muted-foreground" />
+                      {v.primary_contact_email}
+                    </a>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* New session confirm */}

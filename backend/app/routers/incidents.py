@@ -1,5 +1,8 @@
+import re as _re
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from html import escape
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Query, Response
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc
 import aiofiles
@@ -23,6 +26,9 @@ from app.schemas.incident import (
 from app.middleware.auth import get_current_user, require_role
 from app.config import settings
 from app.models.task_template import TaskTemplate as TaskTemplateModel
+from app.services.ws_manager import publish_incident_event
+from app.services.notifications import publish_notification, publish_notification_to_all
+from app.models.notification import NotificationType
 
 router = APIRouter(prefix="/api/incidents", tags=["incidents"])
 
@@ -129,10 +135,16 @@ async def _add_timeline_event(db, incident_id, actor_id, event_type, description
 
 @router.get("", response_model=list[IncidentResponse])
 async def list_incidents(
+    exercise: bool | None = Query(None, description="Filter by exercise flag. None=all, true=only exercises, false=exclude exercises"),
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    result = await db.execute(select(Incident).order_by(desc(Incident.created_at)))
+    q = select(Incident).order_by(desc(Incident.created_at))
+    if exercise is True:
+        q = q.where(Incident.is_exercise == True)
+    elif exercise is False:
+        q = q.where(Incident.is_exercise == False)
+    result = await db.execute(q)
     return result.scalars().all()
 
 
@@ -226,6 +238,7 @@ async def update_incident(
     if not incident:
         raise HTTPException(status_code=404, detail="Incident not found")
 
+    old_severity = incident.severity
     old_status = incident.status
     for field, value in body.model_dump(exclude_none=True).items():
         setattr(incident, field, value)
@@ -233,6 +246,20 @@ async def update_incident(
     if body.status and body.status != old_status:
         await _add_timeline_event(db, incident_id, user.id, "STATUS_CHANGE",
                                    f"Status changed to {body.status.value}")
+
+    if body.severity and body.severity != old_severity:
+        # Notify all active users about severity change
+        all_users = (await db.execute(
+            select(User).where(User.is_active == True, User.id != user.id)
+        )).scalars().all()
+        await publish_notification_to_all(
+            db,
+            [u.id for u in all_users],
+            NotificationType.SEVERITY_CHANGE,
+            title=f"Incident severity changed: {incident.title}",
+            body=f"Severity changed from {old_severity.value} to {body.severity.value}",
+            incident_id=incident_id,
+        )
 
     await db.commit()
     await db.refresh(incident)
@@ -277,7 +304,26 @@ async def add_ioc(incident_id: str, body: IOCCreate, user: User = Depends(requir
     await _add_timeline_event(db, incident_id, user.id, "IOC_ADDED", f"IOC added: [{ioc_type.value}] {body.value}")
     await db.commit()
     await db.refresh(ioc)
-    return IOCResponse.from_orm_ioc(ioc)
+
+    ioc_resp = IOCResponse.from_orm_ioc(ioc)
+    await publish_incident_event(incident_id, {
+        "type": "ioc_added",
+        "actor": user.name or user.email,
+        "data": ioc_resp.model_dump(mode="json"),
+    })
+
+    # Notify incident lead if set
+    inc = (await db.execute(select(Incident).where(Incident.id == incident_id))).scalar_one_or_none()
+    if inc and inc.lead_id and inc.lead_id != user.id:
+        await publish_notification(
+            db, inc.lead_id, NotificationType.IOC_ADDED,
+            title=f"New IOC added to {inc.title}",
+            body=f"[{ioc_type.value}] {body.value}",
+            incident_id=incident_id,
+        )
+        await db.commit()
+
+    return ioc_resp
 
 
 @router.delete("/{incident_id}/iocs/{ioc_id}", status_code=204)
@@ -336,6 +382,11 @@ async def add_note(incident_id: str, body: NoteCreate, user: User = Depends(requ
     await _add_timeline_event(db, incident_id, user.id, "NOTE_ADDED", "Note added to incident")
     await db.commit()
     await db.refresh(note)
+
+    await publish_incident_event(incident_id, {
+        "type": "note_added",
+        "actor": user.name or user.email,
+    })
     return note
 
 
@@ -360,7 +411,43 @@ async def add_timeline_event(incident_id: str, body: TimelineEventCreate, user: 
     db.add(event)
     await db.commit()
     await db.refresh(event)
+
+    await publish_incident_event(incident_id, {
+        "type": "timeline_event",
+        "actor": user.name or user.email,
+        "description": body.description,
+    })
     return event
+
+
+_VALID_TAG = _re.compile(r"^[A-Z0-9_]{2,20}:[A-Za-z0-9_.]{2,20}$")
+
+
+class _TagsBody(BaseModel):
+    tags: list[str]
+
+
+@router.patch("/{incident_id}/timeline/{event_id}/tags")
+async def update_timeline_event_tags(
+    incident_id: str,
+    event_id: str,
+    body: _TagsBody,
+    user: User = Depends(require_role(UserRole.ANALYST)),
+    db: AsyncSession = Depends(get_db),
+):
+    invalid = [t for t in body.tags if not _VALID_TAG.match(t)]
+    if invalid:
+        raise HTTPException(status_code=422, detail=f"Invalid tag format: {invalid[:3]}")
+    result = await db.execute(
+        select(TimelineEvent).where(TimelineEvent.id == event_id, TimelineEvent.incident_id == incident_id)
+    )
+    event = result.scalar_one_or_none()
+    if not event:
+        raise HTTPException(status_code=404, detail="Timeline event not found")
+    event.tags = body.tags
+    await db.commit()
+    await db.refresh(event)
+    return {"id": event.id, "tags": event.tags}
 
 
 # --- Evidence ---
@@ -502,3 +589,127 @@ Key Notes:
     await db.commit()
 
     return {"content": response.content, "note_id": note.id}
+
+
+# --- PDF Report Export ---
+
+@router.get("/{incident_id}/report")
+async def export_report(
+    incident_id: str,
+    ai_narrative: bool = Query(False),
+    user: User = Depends(require_role(UserRole.IR_LEAD)),
+    db: AsyncSession = Depends(get_db),
+):
+    from sqlalchemy.orm import selectinload
+
+    result = await db.execute(
+        select(Incident)
+        .options(
+            selectinload(Incident.iocs),
+            selectinload(Incident.assets),
+            selectinload(Incident.tasks),
+            selectinload(Incident.timeline_events),
+        )
+        .where(Incident.id == incident_id)
+    )
+    incident = result.scalar_one_or_none()
+    if not incident:
+        raise HTTPException(status_code=404, detail="Incident not found")
+
+    narrative = ""
+    if ai_narrative:
+        try:
+            from app.models.knowledge import AIConfig
+            from app.auth.encryption import decrypt
+            from app.services.ai import get_provider, AIMessage
+            ai_cfg = (await db.execute(select(AIConfig).limit(1))).scalar_one_or_none()
+            if ai_cfg and ai_cfg.providers_encrypted:
+                providers_config = decrypt(ai_cfg.providers_encrypted)
+                provider = get_provider({"default_provider": ai_cfg.default_provider, "providers": providers_config})
+                ioc_list = "\n".join([f"- [{i.ioc_type.value}] {i.value}" for i in incident.iocs[:15]])
+                ai_prompt = (
+                    f"Write a 3-paragraph post-incident narrative for the following incident.\n\n"
+                    f"Title: {incident.title}\nType: {incident.incident_type.value}\n"
+                    f"Severity: {incident.severity.value}\nStatus: {incident.status.value}\n"
+                    f"IOCs:\n{ioc_list or 'None'}\n\n"
+                    "Paragraph 1: What happened. Paragraph 2: Impact and response actions. "
+                    "Paragraph 3: Lessons learned and remediation."
+                )
+                ai_resp = await provider.generate([AIMessage(role="user", content=ai_prompt)], max_tokens=800, temperature=0.4)
+                narrative = ai_resp.content
+        except Exception:
+            narrative = ""
+
+    ioc_rows = "".join(
+        f"<tr><td>{escape(i.ioc_type.value)}</td><td style='font-family:monospace'>{escape(i.value)}</td>"
+        f"<td>{escape(str(i.confidence))}</td><td>{escape(i.source or '')}</td></tr>"
+        for i in incident.iocs
+    )
+    task_rows = "".join(
+        f"<tr><td>{escape(t.title)}</td><td>{escape(t.priority.value)}</td><td>{escape(t.status.value)}</td></tr>"
+        for t in sorted(incident.tasks, key=lambda x: x.sort_order)
+    )
+    timeline_rows = "".join(
+        f"<tr><td>{e.occurred_at.strftime('%Y-%m-%d %H:%M')}</td>"
+        f"<td>{escape(e.event_type)}</td><td>{escape(e.description)}</td><td>{escape(e.actor or '')}</td></tr>"
+        for e in sorted(incident.timeline_events, key=lambda x: x.occurred_at)
+    )
+    tasks_done = sum(1 for t in incident.tasks if t.status.value == "DONE")
+    generated_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+
+    sev_color = {"CRITICAL": "#dc2626", "HIGH": "#f97316", "MEDIUM": "#eab308", "LOW": "#3b82f6"}.get(incident.severity.value, "#6b7280")
+
+    html = f"""<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<style>
+  body {{ font-family: Arial, sans-serif; font-size: 12px; color: #111; margin: 40px; }}
+  h1 {{ font-size: 22px; margin-bottom: 4px; }}
+  h2 {{ font-size: 15px; border-bottom: 2px solid #e5e7eb; padding-bottom: 4px; margin-top: 28px; }}
+  .badge {{ display: inline-block; padding: 3px 10px; border-radius: 4px; font-weight: bold; font-size: 11px; color: white; background: {sev_color}; }}
+  .meta {{ color: #6b7280; font-size: 11px; margin-bottom: 20px; }}
+  table {{ width: 100%; border-collapse: collapse; margin-top: 8px; }}
+  th {{ background: #f3f4f6; text-align: left; padding: 6px 8px; font-size: 11px; }}
+  td {{ padding: 5px 8px; border-bottom: 1px solid #e5e7eb; font-size: 11px; }}
+  .narrative {{ background: #f9fafb; border-left: 3px solid #3b82f6; padding: 12px 16px; white-space: pre-wrap; line-height: 1.6; }}
+  .footer {{ margin-top: 40px; font-size: 10px; color: #9ca3af; text-align: center; }}
+</style></head><body>
+<h1>{escape(incident.title)}</h1>
+<div class="meta">
+  <span class="badge">{escape(incident.severity.value)}</span>&nbsp;
+  {escape(incident.incident_type.value.replace("_", " "))} &bull; Status: {escape(incident.status.value)} &bull; Phase: {escape(incident.phase.value)}<br>
+  Started: {incident.started_at.strftime("%Y-%m-%d %H:%M UTC")}
+  {f" &bull; Contained: {incident.contained_at.strftime('%Y-%m-%d %H:%M UTC')}" if incident.contained_at else ""}
+  {f" &bull; Resolved: {incident.resolved_at.strftime('%Y-%m-%d %H:%M UTC')}" if incident.resolved_at else ""}
+</div>
+
+{f'<h2>Executive Narrative</h2><div class="narrative">{narrative}</div>' if narrative else ""}
+
+<h2>IOCs ({len(incident.iocs)})</h2>
+<table><thead><tr><th>Type</th><th>Value</th><th>Confidence</th><th>Source</th></tr></thead>
+<tbody>{ioc_rows or "<tr><td colspan='4'>No IOCs recorded</td></tr>"}</tbody></table>
+
+<h2>Tasks ({tasks_done}/{len(incident.tasks)} complete)</h2>
+<table><thead><tr><th>Task</th><th>Priority</th><th>Status</th></tr></thead>
+<tbody>{task_rows or "<tr><td colspan='3'>No tasks</td></tr>"}</tbody></table>
+
+<h2>Timeline ({len(incident.timeline_events)} events)</h2>
+<table><thead><tr><th>Time</th><th>Event</th><th>Description</th><th>Actor</th></tr></thead>
+<tbody>{timeline_rows or "<tr><td colspan='4'>No timeline events</td></tr>"}</tbody></table>
+
+<div class="footer">Generated by IR Command Center &bull; {generated_at}</div>
+</body></html>"""
+
+    try:
+        import weasyprint
+        pdf_bytes = weasyprint.HTML(string=html).write_pdf()
+    except ImportError:
+        # Fallback: return HTML if weasyprint not installed
+        return Response(content=html, media_type="text/html")
+
+    safe_title = "".join(c if c.isalnum() else "-" for c in incident.title)[:40]
+    filename = f"incident-{safe_title}-{incident_id[:8]}.pdf"
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )

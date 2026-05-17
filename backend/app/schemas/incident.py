@@ -12,6 +12,7 @@ class IncidentCreate(BaseModel):
     incident_type: IncidentType
     severity: Severity
     lead_id: str | None = None
+    is_exercise: bool = False
 
 
 class IncidentUpdate(BaseModel):
@@ -37,6 +38,7 @@ class IncidentResponse(BaseModel):
     started_at: datetime
     contained_at: datetime | None
     resolved_at: datetime | None
+    is_exercise: bool
     created_by: str
     created_at: datetime
     updated_at: datetime
@@ -152,6 +154,7 @@ class TimelineEventResponse(BaseModel):
     description: str
     occurred_at: datetime
     created_at: datetime
+    tags: list[str] = []
 
     class Config:
         from_attributes = True
@@ -198,6 +201,7 @@ class TaskUpdate(BaseModel):
     due_at: datetime | None = None
     labels: str | None = None
     sort_order: int | None = None
+    framework_tags: list[str] | None = None
 
 
 class TaskResponse(BaseModel):
@@ -211,6 +215,7 @@ class TaskResponse(BaseModel):
     due_at: datetime | None
     sort_order: int
     labels: str
+    framework_tags: list[str] = []
     parent_id: str | None
     created_by: str
     created_at: datetime

@@ -6,9 +6,21 @@ from starlette.responses import HTMLResponse
 from app.config import settings
 from app.middleware.audit import AuditMiddleware
 from app.routers import auth, incidents, tasks, documents, scorecard, communications, ai, knowledge, admin, audit, ransomware, v1
-from app.routers import task_templates
+from app.routers import task_templates, notifications, search, metrics, vendors, chat, warroom_ws, compliance, reports
+
+from contextlib import asynccontextmanager
+
+
+@asynccontextmanager
+async def lifespan(app):
+    from app.services.scheduler import start_scheduler, stop_scheduler
+    start_scheduler()
+    yield
+    stop_scheduler()
+
 
 app = FastAPI(
+    lifespan=lifespan,
     title="IR Command Center",
     description="""
 ## IR Command Center API
@@ -48,6 +60,7 @@ Create API keys in **Admin → API Keys**.
         {"name": "knowledge", "description": "Business knowledge base and contacts"},
         {"name": "admin", "description": "User management, SSO config, API keys"},
         {"name": "audit", "description": "Audit log access and export"},
+        {"name": "compliance", "description": "Framework coverage mapper (NIST CSF, ISO 27001, SOC 2)"},
         {"name": "External API v1", "description": "External REST API (API key auth). All endpoints require Bearer token."},
     ],
 )
@@ -81,6 +94,14 @@ app.include_router(admin.router)
 app.include_router(audit.router)
 app.include_router(v1.router)
 app.include_router(task_templates.router)
+app.include_router(notifications.router)
+app.include_router(search.router)
+app.include_router(metrics.router)
+app.include_router(vendors.router)
+app.include_router(chat.router)
+app.include_router(warroom_ws.router)
+app.include_router(compliance.router)
+app.include_router(reports.router)
 
 
 @app.get("/redoc", include_in_schema=False)

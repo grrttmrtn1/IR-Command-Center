@@ -3,13 +3,14 @@
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import api from "@/lib/api";
 import type { Incident, IOC, AffectedAsset, IncidentNote } from "@/lib/types";
 import { SEVERITY_COLORS, IOC_TYPE_ICONS, formatDate, timeAgo } from "@/lib/utils";
 import { useAuth, hasRole } from "@/lib/auth";
 import { toast } from "sonner";
-import { Plus, Sparkles, Clock, FileText, CheckSquare, Lock, MessageSquare, ChevronDown, XCircle, Trash2 } from "lucide-react";
+import { useWarRoomWS } from "@/lib/useWarRoomWS";
+import { Plus, Sparkles, Clock, FileText, CheckSquare, Lock, MessageSquare, ChevronDown, XCircle, Trash2, Download, Wifi, WifiOff } from "lucide-react";
 
 const PHASES = [
   "PREPARATION", "DETECTION", "ANALYSIS", "CONTAINMENT",
@@ -62,6 +63,28 @@ export default function WarRoomPage() {
   const [editingStatus, setEditingStatus] = useState(false);
   const [editingPhase, setEditingPhase] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [reportModal, setReportModal] = useState(false);
+  const [aiNarrative, setAiNarrative] = useState(false);
+  const [wsConnected, setWsConnected] = useState(false);
+
+  const handleWsEvent = useCallback((event: { type: string; actor?: string; data?: unknown }) => {
+    setWsConnected(true);
+    if (event.type === "ioc_added") {
+      qc.invalidateQueries({ queryKey: ["incident-iocs", id] });
+      toast.info(`${event.actor ?? "Teammate"} added an IOC`);
+    } else if (event.type === "task_updated") {
+      qc.invalidateQueries({ queryKey: ["incident-tasks", id] });
+    } else if (event.type === "note_added") {
+      qc.invalidateQueries({ queryKey: ["incident-notes", id] });
+      toast.info(`${event.actor ?? "Teammate"} added a note`);
+    } else if (event.type === "timeline_event") {
+      qc.invalidateQueries({ queryKey: ["incident-timeline", id] });
+    } else if (event.type === "chat_message") {
+      qc.invalidateQueries({ queryKey: ["incident-chat", id] });
+    }
+  }, [qc, id]);
+
+  const { isConnected } = useWarRoomWS(id, handleWsEvent);
 
   const iocMutation = useMutation({
     mutationFn: (data: { ioc_type: string; value: string; confidence: string }) =>
@@ -199,6 +222,22 @@ export default function WarRoomPage() {
         </div>
 
         <div className="flex items-center gap-2">
+          {/* WS connection indicator */}
+          <span title={isConnected() ? "Live updates active" : "Connecting..."} className="shrink-0">
+            {isConnected()
+              ? <Wifi className="h-4 w-4 text-green-500" />
+              : <WifiOff className="h-4 w-4 text-muted-foreground" />
+            }
+          </span>
+          {canLead && (
+            <button
+              onClick={() => setReportModal(true)}
+              className="flex items-center gap-1.5 px-3 py-2 border border-border text-sm font-medium rounded-lg transition-colors hover:bg-muted"
+            >
+              <Download className="h-4 w-4" />
+              Export PDF
+            </button>
+          )}
           {canLead && incident.status !== "CLOSED" && (
             <button
               onClick={() => updateMutation.mutate({ status: "CLOSED", phase: "POST_INCIDENT" })}
@@ -495,6 +534,39 @@ export default function WarRoomPage() {
               >
                 Delete Permanently
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Export report modal */}
+      {reportModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-background rounded-xl border border-border p-6 max-w-md w-full mx-4 shadow-xl">
+            <h3 className="font-semibold text-lg mb-2">Export Incident Report</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              Generate a PDF report for <span className="font-medium text-foreground">{incident.title}</span> including IOCs, timeline, and task completion.
+            </p>
+            <label className="flex items-center gap-2 text-sm mb-6 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={aiNarrative}
+                onChange={(e) => setAiNarrative(e.target.checked)}
+                className="rounded"
+              />
+              Include AI-generated narrative section (requires AI config)
+            </label>
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => setReportModal(false)} className="px-4 py-2 border border-border text-sm rounded-lg">Cancel</button>
+              <a
+                href={`/api/incidents/${id}/report?ai_narrative=${aiNarrative}`}
+                download
+                onClick={() => setReportModal(false)}
+                className="px-4 py-2 bg-primary text-primary-foreground text-sm rounded-lg flex items-center gap-2 hover:opacity-90"
+              >
+                <Download className="h-4 w-4" />
+                Download PDF
+              </a>
             </div>
           </div>
         </div>

@@ -6,7 +6,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import type { TimelineEvent } from "@/lib/types";
 import { toast } from "sonner";
-import { Plus, Clock, AlertCircle, Shield, CheckCircle2 } from "lucide-react";
+import { Plus, Clock, AlertCircle, Shield, CheckCircle2, Tag, X } from "lucide-react";
 
 const EVENT_ICONS: Record<string, React.ReactNode> = {
   DETECTION: <AlertCircle className="h-4 w-4 text-red-500" />,
@@ -17,6 +17,75 @@ const EVENT_ICONS: Record<string, React.ReactNode> = {
 };
 
 const EVENT_TYPES = ["DETECTION", "ANALYSIS", "CONTAINMENT", "ERADICATION", "RECOVERY", "NOTE", "COMMUNICATION", "ESCALATION", "OTHER"];
+
+const QUICK_TAGS = [
+  { tag: "NIST_CSF:RS.MA", label: "Incident Mgmt", color: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" },
+  { tag: "NIST_CSF:RS.AN", label: "Analysis", color: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" },
+  { tag: "NIST_CSF:RS.CO", label: "Reporting", color: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" },
+  { tag: "NIST_CSF:RS.MI", label: "Mitigation", color: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" },
+  { tag: "NIST_CSF:RC.RP", label: "Recovery Plan", color: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" },
+  { tag: "NIST_CSF:DE.AE", label: "Adverse Event", color: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" },
+  { tag: "ISO_27001:A.5.26", label: "ISO: Incident Response", color: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" },
+  { tag: "ISO_27001:A.5.27", label: "ISO: Lessons Learned", color: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" },
+  { tag: "ISO_27001:A.5.28", label: "ISO: Evidence", color: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" },
+  { tag: "SOC2:CC7.3", label: "SOC2: Evaluate Events", color: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400" },
+  { tag: "SOC2:CC7.4", label: "SOC2: Respond", color: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400" },
+  { tag: "SOC2:CC7.5", label: "SOC2: Recover", color: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400" },
+];
+
+function TagPicker({ eventId, currentTags, incidentId }: { eventId: string; currentTags: string[]; incidentId: string }) {
+  const [open, setOpen] = useState(false);
+  const qc = useQueryClient();
+
+  const tagMutation = useMutation({
+    mutationFn: (tags: string[]) => api.patch(`/incidents/${incidentId}/timeline/${eventId}/tags`, { tags }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["incident-timeline", incidentId] });
+      toast.success("Tags updated");
+    },
+  });
+
+  function toggleTag(tag: string) {
+    const next = currentTags.includes(tag) ? currentTags.filter((t) => t !== tag) : [...currentTags, tag];
+    tagMutation.mutate(next);
+  }
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen(!open)}
+        className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground px-2 py-1 rounded-md border border-border hover:border-primary/50 transition-colors"
+      >
+        <Tag className="h-3 w-3" />
+        Tag
+      </button>
+
+      {open && (
+        <div className="absolute right-0 top-7 z-30 w-72 rounded-xl border border-border bg-popover shadow-lg p-3">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Framework Tags</p>
+            <button onClick={() => setOpen(false)}><X className="h-3 w-3 text-muted-foreground" /></button>
+          </div>
+          <div className="flex flex-wrap gap-1.5 max-h-56 overflow-y-auto">
+            {QUICK_TAGS.map(({ tag, label, color }) => (
+              <button
+                key={tag}
+                onClick={() => toggleTag(tag)}
+                className={`px-2 py-1 rounded-full text-xs font-medium transition-all border ${
+                  currentTags.includes(tag)
+                    ? `${color} border-current ring-1 ring-current`
+                    : "bg-muted text-muted-foreground border-border hover:bg-muted/80"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function TimelinePage() {
   const { id } = useParams<{ id: string }>();
@@ -117,10 +186,25 @@ export default function TimelinePage() {
               <div className="flex-1 rounded-xl border border-border bg-card px-4 py-3 mt-1">
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-xs font-semibold text-primary">{event.event_type}</span>
-                  <span className="text-xs text-muted-foreground">{new Date(event.occurred_at).toLocaleString()}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">{new Date(event.occurred_at).toLocaleString()}</span>
+                    <TagPicker eventId={event.id} currentTags={(event as any).tags ?? []} incidentId={id} />
+                  </div>
                 </div>
                 <p className="text-sm text-foreground mt-1">{event.description}</p>
                 {event.actor && <p className="text-xs text-muted-foreground mt-1">— {event.actor}</p>}
+                {((event as any).tags ?? []).length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {((event as any).tags as string[]).map((tag) => {
+                      const qt = QUICK_TAGS.find((q) => q.tag === tag);
+                      return (
+                        <span key={tag} className={`text-xs px-2 py-0.5 rounded-full font-medium ${qt?.color ?? "bg-muted text-muted-foreground"}`}>
+                          {qt?.label ?? tag}
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </div>
           ))}

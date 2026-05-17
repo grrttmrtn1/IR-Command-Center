@@ -20,6 +20,7 @@ const STATUSES = ["OPEN", "CONTAINED", "ERADICATING", "RECOVERING", "CLOSED"] as
 export default function IncidentsPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [showExercises, setShowExercises] = useState(false);
   const [confirmClose, setConfirmClose] = useState<Incident | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<Incident | null>(null);
   const [editStatus, setEditStatus] = useState<{ incident: Incident; field: "status" | "phase" } | null>(null);
@@ -28,8 +29,11 @@ export default function IncidentsPage() {
   const { user } = useAuth();
 
   const { data: incidents = [], isLoading } = useQuery({
-    queryKey: ["incidents"],
-    queryFn: () => api.get<Incident[]>("/incidents").then((r) => r.data),
+    queryKey: ["incidents", showExercises],
+    queryFn: () => {
+      const params = showExercises ? "" : "?exercise=false";
+      return api.get<Incident[]>(`/incidents${params}`).then((r) => r.data);
+    },
   });
 
   const updateMutation = useMutation({
@@ -82,7 +86,7 @@ export default function IncidentsPage() {
       </div>
 
       {/* Filters */}
-      <div className="flex gap-3 mb-5">
+      <div className="flex gap-3 mb-5 flex-wrap">
         <div className="relative flex-1 max-w-xs">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <input
@@ -100,6 +104,15 @@ export default function IncidentsPage() {
           <option value="">All Statuses</option>
           {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
         </select>
+        <label className="flex items-center gap-2 text-sm cursor-pointer px-3 py-2 border border-border rounded-lg bg-background hover:bg-muted transition-colors">
+          <input
+            type="checkbox"
+            checked={showExercises}
+            onChange={(e) => setShowExercises(e.target.checked)}
+            className="rounded"
+          />
+          🧪 Show exercises
+        </label>
       </div>
 
       {isLoading ? (
@@ -137,9 +150,16 @@ export default function IncidentsPage() {
                     </span>
                   </td>
                   <td className="px-4 py-3">
-                    <Link href={`/incidents/${incident.id}`} className="font-medium text-foreground hover:text-primary hover:underline">
-                      {incident.title}
-                    </Link>
+                    <div className="flex items-center gap-2">
+                      <Link href={`/incidents/${incident.id}`} className="font-medium text-foreground hover:text-primary hover:underline">
+                        {incident.title}
+                      </Link>
+                      {incident.is_exercise && (
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-semibold bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400">
+                          EXERCISE
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="px-4 py-3 text-muted-foreground">{INCIDENT_TYPE_LABELS[incident.incident_type]}</td>
                   <td className="px-4 py-3">

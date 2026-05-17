@@ -1,4 +1,7 @@
+import re as _re
 from fastapi import APIRouter, Depends, HTTPException
+
+_VALID_TAG = _re.compile(r"^[A-Z0-9_]{2,20}:[A-Za-z0-9_.]{2,20}$")
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.database import get_db
@@ -6,6 +9,9 @@ from app.models.incident import IncidentTask, TaskStatus
 from app.models.user import User, UserRole
 from app.schemas.incident import TaskCreate, TaskUpdate, TaskResponse, TaskMoveRequest
 from app.middleware.auth import get_current_user, require_role
+from app.services.notifications import publish_notification
+from app.services.ws_manager import publish_incident_event
+from app.models.notification import NotificationType
 
 router = APIRouter(prefix="/api/tasks", tags=["tasks"])
 
@@ -48,10 +54,37 @@ async def update_task(
     task = result.scalar_one_or_none()
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
+
+    if body.framework_tags is not None:
+        invalid = [t for t in body.framework_tags if not _VALID_TAG.match(t)]
+        if invalid:
+            raise HTTPException(status_code=422, detail=f"Invalid tag format: {invalid[:3]}")
+
+    old_assignee = task.assignee_id
     for field, value in body.model_dump(exclude_none=True).items():
         setattr(task, field, value)
     await db.commit()
     await db.refresh(task)
+
+    # Notify new assignee if changed
+    new_assignee = task.assignee_id
+    if new_assignee and new_assignee != old_assignee and new_assignee != user.id:
+        await publish_notification(
+            db, new_assignee, NotificationType.TASK_ASSIGNED,
+            title=f"Task assigned to you: {task.title}",
+            body=f"Assigned by {user.name or user.email}",
+            incident_id=task.incident_id,
+        )
+        await db.commit()
+
+    # Broadcast to war room if incident-scoped
+    if task.incident_id:
+        await publish_incident_event(task.incident_id, {
+            "type": "task_updated",
+            "actor": user.name or user.email,
+            "data": {"id": task.id, "status": task.status.value, "title": task.title},
+        })
+
     return task
 
 

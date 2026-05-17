@@ -20,16 +20,18 @@ export default function AuditPage() {
   const [action, setAction] = useState("");
   const [resource, setResource] = useState("");
   const [since, setSince] = useState("");
+  const [until, setUntil] = useState("");
   const [page, setPage] = useState(0);
   const PAGE_SIZE = 50;
 
   const { data } = useQuery({
-    queryKey: ["audit-logs", search, action, resource, since, page, tab],
+    queryKey: ["audit-logs", search, action, resource, since, until, page, tab],
     queryFn: () => {
       const params: Record<string, string | number | boolean> = { skip: page * PAGE_SIZE, limit: PAGE_SIZE };
       if (action) params.action = action;
       if (resource) params.resource = resource;
       if (since) params.since = new Date(since).toISOString();
+      if (until) params.until = new Date(until + "T23:59:59").toISOString();
       if (tab === "ai") params.ai_only = true;
       return api.get<{ items: AuditLog[]; total: number }>("/audit-logs", { params }).then((r) => r.data);
     },
@@ -43,6 +45,7 @@ export default function AuditPage() {
     if (action) params.set("action", action);
     if (resource) params.set("resource", resource);
     if (since) params.set("since", new Date(since).toISOString());
+    if (until) params.set("until", new Date(until + "T23:59:59").toISOString());
     params.set("format", format);
     window.open(`/api/audit-logs/export?${params}`, "_blank");
   }
@@ -147,12 +150,23 @@ export default function AuditPage() {
             </select>
           </>
         )}
-        <input
-          type="date"
-          value={since}
-          onChange={(e) => { setSince(e.target.value); setPage(0); }}
-          className="px-3 py-2 text-sm border border-border rounded-lg bg-background"
-        />
+        <div className="flex items-center gap-2">
+          <input
+            type="date"
+            value={since}
+            onChange={(e) => { setSince(e.target.value); setPage(0); }}
+            className="px-3 py-2 text-sm border border-border rounded-lg bg-background"
+            title="From date"
+          />
+          <span className="text-muted-foreground text-sm">–</span>
+          <input
+            type="date"
+            value={until}
+            onChange={(e) => { setUntil(e.target.value); setPage(0); }}
+            className="px-3 py-2 text-sm border border-border rounded-lg bg-background"
+            title="Until date"
+          />
+        </div>
       </div>
 
       <div className="rounded-xl border border-border bg-card overflow-hidden">

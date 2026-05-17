@@ -7,8 +7,11 @@ import { cn } from "@/lib/utils";
 import {
   Shield, AlertTriangle, CheckSquare, FileText, MessageSquare,
   Brain, BookOpen, Settings, Users, Key, ClipboardList,
-  Activity, Database, BarChart3, LogOut, ChevronRight, ListTodo,
+  Activity, Database, BarChart3, LogOut, ChevronRight, ListTodo, Building2,
+  ShieldCheck, Mail,
 } from "lucide-react";
+import { NotificationBell } from "@/components/NotificationBell";
+import { GlobalSearch } from "@/components/GlobalSearch";
 
 const navItems = [
   { href: "/", label: "Overview", icon: Activity, minRole: "OBSERVER" },
@@ -18,7 +21,9 @@ const navItems = [
   { href: "/documents", label: "Documents", icon: FileText, minRole: "OBSERVER" },
   { href: "/communications", label: "Crisis Comms", icon: MessageSquare, minRole: "ANALYST" },
   { href: "/ransomware", label: "Ransomware Decision", icon: Brain, minRole: "ANALYST" },
+  { href: "/vendors", label: "Vendor Registry", icon: Building2, minRole: "OBSERVER" },
   { href: "/knowledge", label: "Knowledge Base", icon: BookOpen, minRole: "OBSERVER" },
+  { href: "/compliance", label: "Compliance", icon: ShieldCheck, minRole: "OBSERVER" },
 ];
 
 const adminItems = [
@@ -28,6 +33,8 @@ const adminItems = [
   { href: "/admin/task-templates", label: "Task Templates", icon: ListTodo, minRole: "ADMIN" },
   { href: "/ai-config", label: "AI Config", icon: Settings, minRole: "ADMIN" },
   { href: "/audit", label: "Audit Log", icon: ClipboardList, minRole: "ADMIN" },
+  { href: "/admin/reports", label: "Exec Reports", icon: Mail, minRole: "ADMIN" },
+  { href: "/admin/backup", label: "Backup", icon: Database, minRole: "SUPER_ADMIN" },
 ];
 
 export function Sidebar() {
@@ -57,15 +64,17 @@ export function Sidebar() {
   return (
     <div className="w-64 bg-sidebar flex flex-col h-screen sticky top-0">
       {/* Logo */}
-      <div className="px-4 py-5 border-b border-sidebar-border">
-        <div className="flex items-center gap-3">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600">
+      <div className="px-4 py-4 border-b border-sidebar-border">
+        <div className="flex items-center gap-2">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600 shrink-0">
             <Shield className="h-4 w-4 text-white" />
           </div>
-          <div>
+          <div className="flex-1 min-w-0">
             <p className="text-sm font-bold text-sidebar-foreground">IR Command</p>
             <p className="text-xs text-sidebar-foreground/50">Center</p>
           </div>
+          <GlobalSearch />
+          <NotificationBell userId={user?.id ?? ""} />
         </div>
       </div>
 

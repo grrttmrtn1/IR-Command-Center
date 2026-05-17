@@ -39,6 +39,7 @@ export default function IncidentLayout({ children }: { children: React.ReactNode
     { href: `/incidents/${id}/evidence`, label: "Evidence" },
     { href: `/incidents/${id}/comms`, label: "Comms" },
     { href: `/incidents/${id}/timeline`, label: "Timeline" },
+    { href: `/incidents/${id}/chat`, label: "Chat" },
   ];
 
   return (
@@ -71,6 +72,11 @@ export default function IncidentLayout({ children }: { children: React.ReactNode
           </div>
         </div>
 
+        {incident?.is_exercise && (
+          <div className="mb-3 px-3 py-1.5 bg-orange-100 dark:bg-orange-900/30 border border-orange-300 dark:border-orange-700 rounded-lg text-sm font-medium text-orange-800 dark:text-orange-300 flex items-center gap-2">
+            🧪 TABLETOP EXERCISE — changes do not affect production metrics
+          </div>
+        )}
         {/* Tab navigation */}
         <nav className="flex gap-1">
           {tabs.map((tab) => {

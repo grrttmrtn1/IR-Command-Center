@@ -2,179 +2,232 @@
 
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
+import {
+  BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
+} from "recharts";
 import api from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import { formatDate, SEVERITY_COLORS, STATUS_COLORS } from "@/lib/utils";
-import type { Incident, Assessment } from "@/lib/types";
-import { AlertTriangle, Shield, CheckSquare, BarChart3, ArrowRight, Clock } from "lucide-react";
+import { timeAgo } from "@/lib/utils";
+import type { MetricsSummary, ActivityItem, TrendPoint } from "@/lib/types";
+import {
+  AlertTriangle, Shield, Clock, TrendingUp, ArrowRight, Activity,
+  CheckSquare, Building2, Brain, FileText, MessageSquare,
+} from "lucide-react";
+
+const SEV_COLORS: Record<string, string> = {
+  CRITICAL: "#dc2626",
+  HIGH: "#f97316",
+  MEDIUM: "#eab308",
+  LOW: "#3b82f6",
+};
+
+const ACTIVITY_ICONS: Record<string, string> = {
+  timeline: "📍",
+  audit: "📋",
+};
 
 export default function HomePage() {
   const { user } = useAuth();
 
-  const { data: incidents } = useQuery({
-    queryKey: ["incidents"],
-    queryFn: () => api.get<Incident[]>("/incidents").then((r) => r.data),
+  const { data: summary } = useQuery<MetricsSummary>({
+    queryKey: ["metrics-summary"],
+    queryFn: () => api.get<MetricsSummary>("/metrics/summary").then((r) => r.data),
+    staleTime: 60_000,
   });
 
-  const { data: assessments } = useQuery({
-    queryKey: ["assessments"],
-    queryFn: () => api.get<Assessment[]>("/scorecard").then((r) => r.data),
+  const { data: activity = [] } = useQuery<ActivityItem[]>({
+    queryKey: ["metrics-activity"],
+    queryFn: () => api.get<ActivityItem[]>("/metrics/activity").then((r) => r.data),
+    staleTime: 30_000,
   });
 
-  const openIncidents = incidents?.filter((i) => i.status !== "CLOSED") ?? [];
-  const criticalCount = openIncidents.filter((i) => i.severity === "CRITICAL").length;
-  const latestAssessment = assessments?.[0];
+  const { data: trends } = useQuery<{ points: TrendPoint[] }>({
+    queryKey: ["metrics-trends"],
+    queryFn: () => api.get<{ points: TrendPoint[] }>("/metrics/trends").then((r) => r.data),
+    staleTime: 120_000,
+  });
 
-  const maturityLabels = ["", "Initial", "Developing", "Defined", "Managed", "Optimizing"];
-  const maturityColors = ["", "bg-red-500", "bg-orange-500", "bg-yellow-500", "bg-blue-500", "bg-green-500"];
+  const mttdStr = summary?.mttd_hours != null
+    ? summary.mttd_hours >= 24
+      ? `${(summary.mttd_hours / 24).toFixed(1)}d`
+      : `${summary.mttd_hours}h`
+    : "—";
+
+  const mttrStr = summary?.mttr_hours != null
+    ? summary.mttr_hours >= 24
+      ? `${(summary.mttr_hours / 24).toFixed(1)}d`
+      : `${summary.mttr_hours}h`
+    : "—";
+
+  const severityData = summary
+    ? Object.entries(summary.incidents_by_severity).map(([name, value]) => ({ name, value }))
+    : [];
+
+  const ownerData = (summary?.task_backlog_by_owner ?? []).map((o) => ({
+    name: o.name.split(" ")[0],
+    value: o.count,
+  }));
+
+  const greeting = new Date().getHours() < 12 ? "morning" : new Date().getHours() < 17 ? "afternoon" : "evening";
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-      <div className="mb-8">
+    <div className="p-6 max-w-7xl mx-auto space-y-6">
+      {/* Header */}
+      <div>
         <h1 className="text-2xl font-bold text-foreground">
-          Good {new Date().getHours() < 12 ? "morning" : new Date().getHours() < 17 ? "afternoon" : "evening"},{" "}
-          {user?.name?.split(" ")[0] ?? user?.email.split("@")[0]}
+          Good {greeting}, {user?.name?.split(" ")[0] ?? user?.email.split("@")[0]}
         </h1>
-        <p className="text-muted-foreground mt-1">IR Command Center — {new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}</p>
+        <p className="text-muted-foreground mt-1">
+          {new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
+          {" · "}Production incidents only
+        </p>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-        <StatCard
-          label="Open Incidents"
-          value={openIncidents.length}
-          icon={<AlertTriangle className="h-5 w-5" />}
-          color={openIncidents.length > 0 ? "text-red-500" : "text-green-500"}
-          href="/incidents"
-        />
-        <StatCard
-          label="Critical Incidents"
-          value={criticalCount}
-          icon={<Shield className="h-5 w-5" />}
-          color={criticalCount > 0 ? "text-red-600" : "text-green-500"}
-          href="/incidents"
-        />
-        <StatCard
-          label="IR Maturity"
-          value={latestAssessment ? `${maturityLabels[latestAssessment.maturity_level ?? 0]} (${latestAssessment.maturity_level ?? 0}/5)` : "Not assessed"}
-          icon={<BarChart3 className="h-5 w-5" />}
-          color="text-blue-500"
-          href="/scorecard"
-        />
-        <StatCard
-          label="Total Documents"
-          value="—"
-          icon={<CheckSquare className="h-5 w-5" />}
-          color="text-purple-500"
-          href="/documents"
-        />
+      {/* Stat cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard label="Open Incidents" value={summary?.open_count ?? "—"} icon={<AlertTriangle className="h-5 w-5" />} color={summary?.open_count ? "text-red-500" : "text-green-500"} href="/incidents" />
+        <StatCard label="Critical" value={summary?.critical_count ?? "—"} icon={<Shield className="h-5 w-5" />} color={summary?.critical_count ? "text-red-600" : "text-green-500"} href="/incidents" />
+        <StatCard label="MTTD" value={mttdStr} icon={<Clock className="h-5 w-5" />} color="text-blue-500" href="/incidents" subtitle="detection" />
+        <StatCard label="MTTR" value={mttrStr} icon={<TrendingUp className="h-5 w-5" />} color="text-purple-500" href="/incidents" subtitle="resolution" />
       </div>
 
-      {/* Active Incidents */}
+      {/* Charts row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold">Active Incidents</h2>
-            <Link href="/incidents/new" className="text-sm text-primary hover:underline">
-              + New Incident
-            </Link>
-          </div>
-
-          {openIncidents.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-border p-12 text-center">
-              <Shield className="h-10 w-10 text-green-500 mx-auto mb-3" />
-              <p className="font-medium text-foreground">No active incidents</p>
-              <p className="text-sm text-muted-foreground mt-1">All clear — your organization has no open incidents.</p>
-            </div>
+        {/* Incidents by severity */}
+        <div className="lg:col-span-1 rounded-xl border border-border bg-card p-5">
+          <h2 className="text-sm font-semibold text-foreground mb-4">Open Incidents by Severity</h2>
+          {severityData.some((d) => d.value > 0) ? (
+            <ResponsiveContainer width="100%" height={180}>
+              <BarChart data={severityData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+                <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+                <Tooltip formatter={(v) => [v, "incidents"]} />
+                <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                  {severityData.map((entry) => (
+                    <Cell key={entry.name} fill={SEV_COLORS[entry.name] ?? "#6b7280"} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
           ) : (
-            <div className="space-y-3">
-              {openIncidents.slice(0, 8).map((incident) => (
-                <Link key={incident.id} href={`/incidents/${incident.id}`}>
-                  <div className="rounded-xl border border-border bg-card p-4 hover:border-primary/50 transition-colors cursor-pointer">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold ${SEVERITY_COLORS[incident.severity]}`}>
-                            {incident.severity}
-                          </span>
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium ${STATUS_COLORS[incident.status]}`}>
-                            {incident.status}
-                          </span>
-                          <span className="text-xs text-muted-foreground">{incident.incident_type.replace("_", " ")}</span>
-                        </div>
-                        <p className="font-medium text-foreground truncate">{incident.title}</p>
-                        <div className="flex items-center gap-1 mt-1 text-xs text-muted-foreground">
-                          <Clock className="h-3 w-3" />
-                          {formatDate(incident.started_at)}
-                        </div>
-                      </div>
-                      <ArrowRight className="h-4 w-4 text-muted-foreground shrink-0 mt-1" />
-                    </div>
-                  </div>
-                </Link>
-              ))}
+            <div className="flex flex-col items-center justify-center h-40 text-center">
+              <Shield className="h-8 w-8 text-green-500 mb-2" />
+              <p className="text-sm text-muted-foreground">No open incidents</p>
             </div>
           )}
         </div>
 
-        {/* Quick Actions */}
-        <div>
-          <h2 className="text-lg font-semibold mb-4">Quick Actions</h2>
-          <div className="space-y-2">
-            <QuickAction href="/incidents/new" label="Declare New Incident" description="Start a new incident response" color="bg-red-50 hover:bg-red-100 dark:bg-red-950/30 border-red-200 dark:border-red-900" icon="🚨" />
-            <QuickAction href="/communications" label="Draft Notification" description="Crisis comms for any jurisdiction" color="bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/30 border-blue-200 dark:border-blue-900" icon="📨" />
-            <QuickAction href="/ransomware" label="Ransomware Decision Tool" description="Structured response framework" color="bg-orange-50 hover:bg-orange-100 dark:bg-orange-950/30 border-orange-200 dark:border-orange-900" icon="⚡" />
-            <QuickAction href="/scorecard" label="Run IR Assessment" description="Evaluate your readiness maturity" color="bg-purple-50 hover:bg-purple-100 dark:bg-purple-950/30 border-purple-200 dark:border-purple-900" icon="📊" />
-            <QuickAction href="/documents/templates" label="Browse Templates" description="Playbooks, procedures, notifications" color="bg-green-50 hover:bg-green-100 dark:bg-green-950/30 border-green-200 dark:border-green-900" icon="📋" />
-          </div>
-
-          {latestAssessment && (
-            <div className="mt-6">
-              <h3 className="text-sm font-semibold text-muted-foreground mb-3 uppercase tracking-wider">Latest Assessment</h3>
-              <div className="rounded-xl border border-border bg-card p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium">{latestAssessment.title}</span>
-                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold text-white ${maturityColors[latestAssessment.maturity_level ?? 0]}`}>
-                    Level {latestAssessment.maturity_level}
-                  </span>
-                </div>
-                <div className="w-full bg-muted rounded-full h-2">
-                  <div
-                    className={`h-2 rounded-full transition-all ${maturityColors[latestAssessment.maturity_level ?? 0]}`}
-                    style={{ width: `${(latestAssessment.overall_score ?? 0)}%` }}
-                  />
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">{latestAssessment.overall_score?.toFixed(0)}% — {maturityLabels[latestAssessment.maturity_level ?? 0]}</p>
-              </div>
+        {/* MTTD/MTTR trends */}
+        <div className="lg:col-span-2 rounded-xl border border-border bg-card p-5">
+          <h2 className="text-sm font-semibold text-foreground mb-4">Incident Volume — Last 8 Weeks</h2>
+          {trends?.points && trends.points.some((p) => p.opened > 0 || p.closed > 0) ? (
+            <ResponsiveContainer width="100%" height={180}>
+              <LineChart data={trends.points} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
+                <XAxis dataKey="week" tick={{ fontSize: 10 }} />
+                <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+                <Tooltip />
+                <Line type="monotone" dataKey="opened" stroke="#ef4444" strokeWidth={2} dot={false} name="Opened" />
+                <Line type="monotone" dataKey="closed" stroke="#22c55e" strokeWidth={2} dot={false} name="Closed" />
+              </LineChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="flex items-center justify-center h-40">
+              <p className="text-sm text-muted-foreground">Not enough data yet</p>
             </div>
           )}
+        </div>
+      </div>
+
+      {/* Task backlog + Activity feed */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Task backlog by owner */}
+        <div className="rounded-xl border border-border bg-card p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-sm font-semibold text-foreground">Task Backlog by Owner</h2>
+            <span className="text-xs text-muted-foreground">{summary?.total_tasks_open ?? 0} open</span>
+          </div>
+          {ownerData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={180}>
+              <BarChart data={ownerData} layout="vertical" margin={{ top: 0, right: 8, left: 8, bottom: 0 }}>
+                <XAxis type="number" tick={{ fontSize: 11 }} allowDecimals={false} />
+                <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={60} />
+                <Tooltip formatter={(v) => [v, "tasks"]} />
+                <Bar dataKey="value" fill="#3b82f6" radius={[0, 4, 4, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="flex flex-col items-center justify-center h-40 text-center">
+              <CheckSquare className="h-8 w-8 text-green-500 mb-2" />
+              <p className="text-sm text-muted-foreground">No open tasks</p>
+            </div>
+          )}
+        </div>
+
+        {/* Recent activity feed */}
+        <div className="lg:col-span-2 rounded-xl border border-border bg-card p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-sm font-semibold text-foreground">Recent Activity</h2>
+            <Activity className="h-4 w-4 text-muted-foreground" />
+          </div>
+          <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
+            {activity.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-6">No recent activity</p>
+            ) : (
+              activity.map((item, i) => (
+                <div key={i} className="flex items-start gap-3">
+                  <span className="text-base mt-0.5">{ACTIVITY_ICONS[item.type] ?? "•"}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-foreground truncate">{item.description}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {item.actor && <span>{item.actor} · </span>}
+                      {timeAgo(item.occurred_at)}
+                    </p>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Quick Actions */}
+      <div>
+        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">Quick Actions</h2>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+          <QuickAction href="/incidents/new" label="Declare Incident" icon={<AlertTriangle className="h-4 w-4" />} color="bg-red-50 hover:bg-red-100 dark:bg-red-950/30 border-red-200 dark:border-red-900 text-red-700 dark:text-red-400" />
+          <QuickAction href="/communications" label="Draft Notification" icon={<MessageSquare className="h-4 w-4" />} color="bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/30 border-blue-200 dark:border-blue-900 text-blue-700 dark:text-blue-400" />
+          <QuickAction href="/ransomware" label="Ransomware Tool" icon={<Brain className="h-4 w-4" />} color="bg-orange-50 hover:bg-orange-100 dark:bg-orange-950/30 border-orange-200 dark:border-orange-900 text-orange-700 dark:text-orange-400" />
+          <QuickAction href="/scorecard" label="IR Assessment" icon={<TrendingUp className="h-4 w-4" />} color="bg-purple-50 hover:bg-purple-100 dark:bg-purple-950/30 border-purple-200 dark:border-purple-900 text-purple-700 dark:text-purple-400" />
+          <QuickAction href="/vendors" label="Vendor Registry" icon={<Building2 className="h-4 w-4" />} color="bg-green-50 hover:bg-green-100 dark:bg-green-950/30 border-green-200 dark:border-green-900 text-green-700 dark:text-green-400" />
         </div>
       </div>
     </div>
   );
 }
 
-function StatCard({ label, value, icon, color, href }: { label: string; value: string | number; icon: React.ReactNode; color: string; href: string }) {
+function StatCard({
+  label, value, icon, color, href, subtitle,
+}: {
+  label: string; value: string | number; icon: React.ReactNode; color: string; href: string; subtitle?: string;
+}) {
   return (
     <Link href={href}>
       <div className="rounded-xl border border-border bg-card p-5 hover:border-primary/50 transition-colors cursor-pointer">
         <div className={`${color} mb-3`}>{icon}</div>
         <p className="text-2xl font-bold text-foreground">{value}</p>
-        <p className="text-sm text-muted-foreground mt-1">{label}</p>
+        <p className="text-sm text-muted-foreground mt-1">{label}{subtitle && <span className="text-xs ml-1 opacity-70">({subtitle})</span>}</p>
       </div>
     </Link>
   );
 }
 
-function QuickAction({ href, label, description, color, icon }: { href: string; label: string; description: string; color: string; icon: string }) {
+function QuickAction({ href, label, icon, color }: { href: string; label: string; icon: React.ReactNode; color: string }) {
   return (
     <Link href={href}>
-      <div className={`rounded-xl border p-3 flex items-center gap-3 transition-colors cursor-pointer ${color}`}>
-        <span className="text-xl">{icon}</span>
-        <div className="min-w-0">
-          <p className="text-sm font-medium text-foreground">{label}</p>
-          <p className="text-xs text-muted-foreground truncate">{description}</p>
-        </div>
+      <div className={`rounded-xl border p-3 flex items-center gap-2 transition-colors cursor-pointer ${color}`}>
+        {icon}
+        <p className="text-sm font-medium truncate">{label}</p>
+        <ArrowRight className="h-3.5 w-3.5 ml-auto shrink-0 opacity-60" />
       </div>
     </Link>
   );

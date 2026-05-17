@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import type { Document } from "@/lib/types";
 import { toast } from "sonner";
-import { Plus, Search, FileText } from "lucide-react";
+import { Plus, Search, FileText, Trash2 } from "lucide-react";
 import { MarkdownViewer } from "@/components/MarkdownViewer";
 
 const CATEGORIES = ["PLAYBOOK", "PROCEDURE", "POLICY", "TEMPLATE", "EVIDENCE", "LEGAL", "COMMUNICATION", "TRAINING", "OTHER"];
@@ -49,6 +49,16 @@ export default function DocumentsPage() {
       setSelected(doc);
       toast.success("Document saved (v" + doc.version + ")");
     },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => api.delete(`/documents/${id}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["documents"] });
+      setSelected(null);
+      toast.success("Document deleted");
+    },
+    onError: () => toast.error("Failed to delete document"),
   });
 
   return (
@@ -205,6 +215,20 @@ export default function DocumentsPage() {
                       className="px-3 py-1.5 bg-primary text-primary-foreground text-xs rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors"
                     >
                       Save
+                    </button>
+                  )}
+                  {!selected.is_system_template && (
+                    <button
+                      onClick={() => {
+                        if (confirm(`Delete "${selected.title}"? This cannot be undone.`)) {
+                          deleteMutation.mutate(selected.id);
+                        }
+                      }}
+                      disabled={deleteMutation.isPending}
+                      className="p-1.5 text-destructive hover:bg-destructive/10 rounded-lg transition-colors disabled:opacity-50"
+                      title="Delete document"
+                    >
+                      <Trash2 className="h-4 w-4" />
                     </button>
                   )}
                 </div>

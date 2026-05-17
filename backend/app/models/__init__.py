@@ -10,6 +10,7 @@ from app.models.audit import AuditLog
 from app.models.knowledge import OrgKnowledge, AIConfig, ContactList
 from app.models.task_template import TaskTemplate
 from app.models.ransomware import RansomwareSession
+from app.models.report import ReportSchedule
 
 __all__ = [
     "User", "Session", "MFABackupCode", "ApiKey", "SSOConfig", "UserRole",
@@ -22,4 +23,5 @@ __all__ = [
     "OrgKnowledge", "AIConfig", "ContactList",
     "TaskTemplate",
     "RansomwareSession",
+    "ReportSchedule",
 ]
