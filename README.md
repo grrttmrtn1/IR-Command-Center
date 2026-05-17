@@ -13,6 +13,30 @@ When a breach hits, your team shouldn't be juggling spreadsheets, chat threads, 
 - **Covers the full lifecycle.** Ransomware negotiation decisions, jurisdiction-aware breach notifications, IR maturity scorecards, document libraries — tools most platforms charge extra for or don't offer at all.
 - **Deploy in minutes.** One `.env` file, one `docker compose up`. No Kubernetes, no cloud accounts, no vendor lock-in.
 
+
+<img width="1440" height="785" alt="image" src="https://github.com/user-attachments/assets/8e714d7d-3659-410d-bef2-2dd22f480fd0" />
+<img width="1435" height="786" alt="image" src="https://github.com/user-attachments/assets/b29b11b6-ffe4-4de8-86cc-f13992ed23a3" />
+<img width="1428" height="785" alt="image" src="https://github.com/user-attachments/assets/ac9abc63-285d-46c7-a7a4-4bad74e840d8" />
+<img width="1437" height="784" alt="image" src="https://github.com/user-attachments/assets/90f95068-0f7f-40fd-beef-9118755304d5" />
+<img width="1439" height="781" alt="image" src="https://github.com/user-attachments/assets/93e2a5d6-bb6e-4856-a42c-f7259a234aff" />
+<img width="1435" height="786" alt="image" src="https://github.com/user-attachments/assets/4d7791ed-24da-414c-9631-e6365ad32b74" />
+<img width="1440" height="785" alt="image" src="https://github.com/user-attachments/assets/756aa590-ed7c-4fae-ab7e-9becdcc5553e" />
+<img width="1438" height="787" alt="image" src="https://github.com/user-attachments/assets/00abce59-4a50-4eda-a3a1-062be41a7b9c" />
+<img width="1439" height="787" alt="image" src="https://github.com/user-attachments/assets/62cbc151-aea5-4be8-9b16-9500b285eebb" />
+<img width="1440" height="786" alt="image" src="https://github.com/user-attachments/assets/07da1101-aee0-4eba-9256-137d23621c14" />
+<img width="1440" height="783" alt="image" src="https://github.com/user-attachments/assets/57eaf86f-a3f4-432f-9dce-9bfa7cb4816e" />
+
+
+
+
+
+
+
+
+
+
+
+
 ---
 
 ## Features
