@@ -41,18 +41,26 @@ async def update_knowledge(body: OrgKnowledgeUpdate, user: User = Depends(requir
 @router.get("/contacts", response_model=list[ContactResponse])
 async def list_contacts(
     contact_type: str | None = None,
+    category: str | None = None,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    query = select(ContactList).order_by(ContactList.name)
+    from sqlalchemy import case as sa_case, nullslast
+    query = select(ContactList).order_by(
+        ContactList.category,
+        nullslast(ContactList.escalation_order.asc()),
+        ContactList.name,
+    )
     if contact_type:
-        query = query.where(ContactList.contact_type == contact_type)
+        query = query.where(ContactList.type == contact_type)
+    if category:
+        query = query.where(ContactList.category == category)
     result = await db.execute(query)
     return result.scalars().all()
 
 
 @router.post("/contacts", response_model=ContactResponse, status_code=201)
-async def create_contact(body: ContactCreate, user: User = Depends(require_role(UserRole.ADMIN)), db: AsyncSession = Depends(get_db)):
+async def create_contact(body: ContactCreate, user: User = Depends(require_role(UserRole.IR_LEAD)), db: AsyncSession = Depends(get_db)):
     contact = ContactList(**body.model_dump())
     db.add(contact)
     await db.commit()
@@ -61,7 +69,7 @@ async def create_contact(body: ContactCreate, user: User = Depends(require_role(
 
 
 @router.patch("/contacts/{contact_id}", response_model=ContactResponse)
-async def update_contact(contact_id: str, body: ContactCreate, user: User = Depends(require_role(UserRole.ADMIN)), db: AsyncSession = Depends(get_db)):
+async def update_contact(contact_id: str, body: ContactCreate, user: User = Depends(require_role(UserRole.IR_LEAD)), db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(ContactList).where(ContactList.id == contact_id))
     contact = result.scalar_one_or_none()
     if not contact:
@@ -74,7 +82,7 @@ async def update_contact(contact_id: str, body: ContactCreate, user: User = Depe
 
 
 @router.delete("/contacts/{contact_id}", status_code=204)
-async def delete_contact(contact_id: str, user: User = Depends(require_role(UserRole.ADMIN)), db: AsyncSession = Depends(get_db)):
+async def delete_contact(contact_id: str, user: User = Depends(require_role(UserRole.IR_LEAD)), db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(ContactList).where(ContactList.id == contact_id))
     contact = result.scalar_one_or_none()
     if not contact:

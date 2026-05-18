@@ -65,6 +65,7 @@ export default function AdminUsersPage() {
   const [confirmDelete, setConfirmDelete] = useState<User | null>(null);
 
   const isAdmin = hasRole(currentUser, "ADMIN");
+  const isSuperAdmin = hasRole(currentUser, "SUPER_ADMIN");
 
   const { data: users = [] } = useQuery({
     queryKey: ["admin-users"],
@@ -212,7 +213,7 @@ export default function AdminUsersPage() {
                       onChange={(e) => setEditUser({ ...editUser, role: e.target.value as User["role"] })}
                       className="px-2 py-1 text-xs border border-border rounded bg-background"
                     >
-                      {ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
+                      {ROLES.filter((r) => r !== "SUPER_ADMIN" || isSuperAdmin).map((r) => <option key={r} value={r}>{r}</option>)}
                     </select>
                   ) : (
                     <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${ROLE_COLORS[user.role] ?? ROLE_COLORS.OBSERVER}`}>
@@ -252,16 +253,20 @@ export default function AdminUsersPage() {
                         </>
                       ) : (
                         <>
-                          <button onClick={() => setEditUser(user)} className="p-1.5 text-muted-foreground hover:text-foreground rounded transition-colors" title="Edit role">
-                            <Pencil className="h-3.5 w-3.5" />
-                          </button>
-                          <button
-                            onClick={() => toggleActiveMutation.mutate({ id: user.id, is_active: !user.is_active })}
-                            className="p-1.5 text-muted-foreground hover:text-foreground rounded transition-colors"
-                            title={user.is_active ? "Disable user" : "Enable user"}
-                          >
-                            {user.is_active ? <UserX className="h-3.5 w-3.5" /> : <UserCheck className="h-3.5 w-3.5" />}
-                          </button>
+                          {user.id !== currentUser?.id && (
+                            <button onClick={() => setEditUser(user)} className="p-1.5 text-muted-foreground hover:text-foreground rounded transition-colors" title="Edit role">
+                              <Pencil className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+                          {user.id !== currentUser?.id && (user.role !== "SUPER_ADMIN" || isSuperAdmin) && (
+                            <button
+                              onClick={() => toggleActiveMutation.mutate({ id: user.id, is_active: !user.is_active })}
+                              className="p-1.5 text-muted-foreground hover:text-foreground rounded transition-colors"
+                              title={user.is_active ? "Disable user" : "Enable user"}
+                            >
+                              {user.is_active ? <UserX className="h-3.5 w-3.5" /> : <UserCheck className="h-3.5 w-3.5" />}
+                            </button>
+                          )}
                           {user.id !== currentUser?.id && user.role !== "SUPER_ADMIN" && (
                             <button
                               onClick={() => setConfirmDelete(user)}

@@ -8,10 +8,10 @@ import {
 import api from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { timeAgo } from "@/lib/utils";
-import type { MetricsSummary, ActivityItem, TrendPoint } from "@/lib/types";
+import type { MetricsSummary, ActivityItem, TrendPoint, ReadinessScore } from "@/lib/types";
 import {
   AlertTriangle, Shield, Clock, TrendingUp, ArrowRight, Activity,
-  CheckSquare, Building2, Brain, MessageSquare,
+  CheckSquare, Building2, Brain, MessageSquare, ShieldCheck,
 } from "lucide-react";
 
 const SEV_COLORS: Record<string, string> = {
@@ -67,6 +67,12 @@ export default function HomePage() {
     name: o.name.split(" ")[0],
     value: o.count,
   }));
+
+  const { data: readiness } = useQuery<ReadinessScore>({
+    queryKey: ["readiness-score"],
+    queryFn: () => api.get<ReadinessScore>("/readiness/score").then((r) => r.data),
+    staleTime: 10 * 60 * 1000,
+  });
 
   const greeting = new Date().getHours() < 12 ? "morning" : new Date().getHours() < 17 ? "afternoon" : "evening";
 
@@ -242,14 +248,51 @@ export default function HomePage() {
         </div>
       </div>
 
+      {/* IR Readiness widget */}
+      {readiness && (
+        <Link href="/readiness" className="block group">
+          <div className="rounded-xl border border-border bg-card p-5 shadow-sm hover:shadow-md transition-all duration-200">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="h-4 w-4 text-primary" />
+                <h2 className="text-sm font-semibold">IR Readiness Score</h2>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className={`text-2xl font-black tabular-nums ${readiness.total >= 75 ? "text-emerald-600 dark:text-emerald-400" : readiness.total >= 50 ? "text-yellow-600 dark:text-yellow-400" : "text-red-600 dark:text-red-400"}`}>
+                  {readiness.total}
+                </span>
+                <span className={`text-lg font-black px-2 py-0.5 rounded-lg ${readiness.grade === "A" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" : readiness.grade === "B" ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" : readiness.grade === "C" ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400" : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"}`}>
+                  {readiness.grade}
+                </span>
+                <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:translate-x-1 transition-transform" />
+              </div>
+            </div>
+            <div className="grid grid-cols-5 gap-2">
+              {readiness.dimensions.map((dim) => (
+                <div key={dim.label} className="text-center">
+                  <div className="text-xs font-semibold tabular-nums">{dim.score}</div>
+                  <div className="mt-1 h-1 bg-muted rounded-full overflow-hidden">
+                    <div
+                      className={`h-1 rounded-full ${dim.status === "GOOD" ? "bg-emerald-500" : dim.status === "WARNING" ? "bg-yellow-500" : "bg-red-500"}`}
+                      style={{ width: `${dim.score}%` }}
+                    />
+                  </div>
+                  <div className="text-[9px] text-muted-foreground mt-1 leading-tight truncate">{dim.label.split(" ")[0]}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </Link>
+      )}
+
       {/* Quick Actions */}
       <div>
         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-3">Quick Actions</p>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
           <QuickAction href="/incidents/new" label="Declare Incident" icon={<AlertTriangle className="h-4 w-4" />} color="bg-red-50 hover:bg-red-100 border-red-200 text-red-700 dark:bg-red-950/30 dark:border-red-900 dark:text-red-400" />
-          <QuickAction href="/communications" label="Draft Notification" icon={<MessageSquare className="h-4 w-4" />} color="bg-blue-50 hover:bg-blue-100 border-blue-200 text-blue-700 dark:bg-blue-950/30 dark:border-blue-900 dark:text-blue-400" />
+          <QuickAction href="/playbooks" label="Run a Playbook" icon={<ShieldCheck className="h-4 w-4" />} color="bg-blue-50 hover:bg-blue-100 border-blue-200 text-blue-700 dark:bg-blue-950/30 dark:border-blue-900 dark:text-blue-400" />
           <QuickAction href="/ransomware" label="Ransomware Tool" icon={<Brain className="h-4 w-4" />} color="bg-orange-50 hover:bg-orange-100 border-orange-200 text-orange-700 dark:bg-orange-950/30 dark:border-orange-900 dark:text-orange-400" />
-          <QuickAction href="/scorecard" label="IR Assessment" icon={<TrendingUp className="h-4 w-4" />} color="bg-purple-50 hover:bg-purple-100 border-purple-200 text-purple-700 dark:bg-purple-950/30 dark:border-purple-900 dark:text-purple-400" />
+          <QuickAction href="/contacts" label="Contact Directory" icon={<CheckSquare className="h-4 w-4" />} color="bg-purple-50 hover:bg-purple-100 border-purple-200 text-purple-700 dark:bg-purple-950/30 dark:border-purple-900 dark:text-purple-400" />
           <QuickAction href="/vendors" label="Vendor Registry" icon={<Building2 className="h-4 w-4" />} color="bg-green-50 hover:bg-green-100 border-green-200 text-green-700 dark:bg-green-950/30 dark:border-green-900 dark:text-green-400" />
         </div>
       </div>

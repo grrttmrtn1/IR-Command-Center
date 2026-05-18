@@ -7,6 +7,7 @@ from app.config import settings
 from app.middleware.audit import AuditMiddleware
 from app.routers import auth, incidents, tasks, documents, scorecard, communications, ai, knowledge, admin, audit, ransomware, v1
 from app.routers import task_templates, notifications, search, metrics, vendors, chat, warroom_ws, compliance, reports
+from app.routers import playbooks, irplan, readiness
 
 from contextlib import asynccontextmanager
 
@@ -61,6 +62,9 @@ Create API keys in **Admin → API Keys**.
         {"name": "admin", "description": "User management, SSO config, API keys"},
         {"name": "audit", "description": "Audit log access and export"},
         {"name": "compliance", "description": "Framework coverage mapper (NIST CSF, ISO 27001, SOC 2)"},
+        {"name": "playbooks", "description": "IR response playbooks (built-in + custom) with incident activation"},
+        {"name": "ir-plan", "description": "Living IR Plan sections and on-call rosters"},
+        {"name": "readiness", "description": "IR readiness score and preparedness assessment"},
         {"name": "External API v1", "description": "External REST API (API key auth). All endpoints require Bearer token."},
     ],
 )
@@ -102,6 +106,9 @@ app.include_router(chat.router)
 app.include_router(warroom_ws.router)
 app.include_router(compliance.router)
 app.include_router(reports.router)
+app.include_router(playbooks.router)
+app.include_router(irplan.router)
+app.include_router(readiness.router)
 
 
 @app.get("/redoc", include_in_schema=False)

@@ -39,19 +39,19 @@ export default function CrisisCommsPage() {
 
   const { data: drafts = [], isLoading } = useQuery({
     queryKey: ["comms-drafts", id],
-    queryFn: () => api.get<CommsDraft[]>(`/api/comms/drafts?incident_id=${id}`).then((r) => r.data),
+    queryFn: () => api.get<CommsDraft[]>(`/comms/drafts?incident_id=${id}`).then((r) => r.data),
   });
 
   const { data: jurisdictions = [] } = useQuery({
     queryKey: ["jurisdictions"],
-    queryFn: () => api.get<Jurisdiction[]>("/api/comms/jurisdictions").then((r) => r.data),
+    queryFn: () => api.get<Jurisdiction[]>("/comms/jurisdictions").then((r) => r.data),
   });
 
   const selectedDraft = drafts.find((d) => d.id === selectedDraftId) ?? null;
 
   const createMutation = useMutation({
     mutationFn: (data: { title: string; jurisdiction: string; content: string; incident_id: string }) =>
-      api.post<CommsDraft>("/api/comms/drafts", data),
+      api.post<CommsDraft>("/comms/drafts", data),
     onSuccess: (res) => {
       qc.invalidateQueries({ queryKey: ["comms-drafts", id] });
       setSelectedDraftId(res.data.id);
@@ -63,7 +63,7 @@ export default function CrisisCommsPage() {
 
   const updateMutation = useMutation({
     mutationFn: ({ draftId, content }: { draftId: string; content: string }) =>
-      api.patch<CommsDraft>(`/api/comms/drafts/${draftId}`, { content }),
+      api.patch<CommsDraft>(`/comms/drafts/${draftId}`, { content }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["comms-drafts", id] });
       toast.success("Draft saved");
@@ -71,7 +71,7 @@ export default function CrisisCommsPage() {
   });
 
   const approveMutation = useMutation({
-    mutationFn: (draftId: string) => api.post<CommsDraft>(`/api/comms/drafts/${draftId}/approve`),
+    mutationFn: (draftId: string) => api.post<CommsDraft>(`/comms/drafts/${draftId}/approve`),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["comms-drafts", id] });
       toast.success("Draft approved");
@@ -79,7 +79,7 @@ export default function CrisisCommsPage() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (draftId: string) => api.delete(`/api/comms/drafts/${draftId}`),
+    mutationFn: (draftId: string) => api.delete(`/comms/drafts/${draftId}`),
     onSuccess: (_, draftId) => {
       qc.invalidateQueries({ queryKey: ["comms-drafts", id] });
       if (selectedDraftId === draftId) setSelectedDraftId(null);
@@ -90,7 +90,7 @@ export default function CrisisCommsPage() {
   async function generateDraft(draftId: string) {
     setGenerating(true);
     try {
-      const res = await api.post<CommsDraft>(`/api/comms/drafts/${draftId}/generate`, {
+      const res = await api.post<CommsDraft>(`/comms/drafts/${draftId}/generate`, {
         context: generatingContext || undefined,
       });
       qc.setQueryData(["comms-drafts", id], (old: CommsDraft[] | undefined) =>

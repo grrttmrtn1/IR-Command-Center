@@ -55,8 +55,13 @@ class ContactCreate(BaseModel):
     role: str | None = None
     email: str | None = None
     phone: str | None = None
+    secondary_phone: str | None = None
     organization: str | None = None
     type: str = "INTERNAL"
+    category: str = "OTHER"
+    escalation_order: int | None = None
+    is_primary: bool = False
+    notes: str | None = None
 
 
 class ContactResponse(BaseModel):
@@ -65,9 +70,15 @@ class ContactResponse(BaseModel):
     role: str | None
     email: str | None
     phone: str | None
+    secondary_phone: str | None
     organization: str | None
     type: str
+    category: str
+    escalation_order: int | None
+    is_primary: bool
+    notes: str | None
     created_at: datetime
+    updated_at: datetime
 
     class Config:
         from_attributes = True

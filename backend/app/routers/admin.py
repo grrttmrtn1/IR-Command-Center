@@ -51,9 +51,18 @@ async def update_user(user_id: str, body: UserAdminUpdate, user: User = Depends(
     target = result.scalar_one_or_none()
     if not target:
         raise HTTPException(status_code=404, detail="User not found")
-    # Protect super admin from demotion by non-super-admin
+    # Prevent self-modification of role or active status
+    if target.id == user.id:
+        if body.role is not None and body.role != user.role:
+            raise HTTPException(status_code=400, detail="Cannot change your own role")
+        if body.is_active is not None and not body.is_active:
+            raise HTTPException(status_code=400, detail="Cannot deactivate your own account")
+    # Protect super admin from modification by non-super-admin
     if target.role == UserRole.SUPER_ADMIN and user.role != UserRole.SUPER_ADMIN:
         raise HTTPException(status_code=403, detail="Cannot modify super admin")
+    # Prevent non-super-admins from assigning the super admin role
+    if body.role == UserRole.SUPER_ADMIN and user.role != UserRole.SUPER_ADMIN:
+        raise HTTPException(status_code=403, detail="Cannot assign super admin role")
     for field, value in body.model_dump(exclude_none=True).items():
         setattr(target, field, value)
     await db.commit()
