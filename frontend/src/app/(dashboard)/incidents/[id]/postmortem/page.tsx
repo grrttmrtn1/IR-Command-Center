@@ -2,16 +2,18 @@
 
 import { useParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import api from "@/lib/api";
 import type { PostMortem, PostMortemActionItem, Incident, FiveWhy } from "@/lib/types";
 import { useAuth, hasRole } from "@/lib/auth";
+import { timeAgo } from "@/lib/utils";
 import { toast } from "sonner";
 import {
   FileText, Sparkles, Plus, Trash2, CheckCircle2, Clock, AlertTriangle,
   ChevronDown, Edit3, Save, X, User,
 } from "lucide-react";
 import { RichTextEditor } from "@/components/RichTextEditor";
+import { MarkdownViewer } from "@/components/MarkdownViewer";
 
 const PRIORITY_STYLES: Record<string, string> = {
   CRITICAL: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
@@ -26,13 +28,6 @@ const ITEM_STATUS_STYLES: Record<string, string> = {
   DONE:        "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
 };
 
-function timeAgo(iso: string) {
-  const diff = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
-  if (diff < 1) return "just now";
-  if (diff < 60) return `${diff}m ago`;
-  if (diff < 1440) return `${Math.round(diff / 60)}h ago`;
-  return `${Math.round(diff / 1440)}d ago`;
-}
 
 interface EditableTextareaProps {
   label: string;
@@ -47,6 +42,10 @@ interface EditableTextareaProps {
 function EditableSection({ label, value, field, placeholder, rows = 4, canEdit, onSave }: EditableTextareaProps) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value ?? "");
+
+  useEffect(() => {
+    if (!editing) setDraft(value ?? "");
+  }, [value, editing]);
 
   const handleSave = () => {
     onSave(field, draft);
@@ -91,7 +90,7 @@ function EditableSection({ label, value, field, placeholder, rows = 4, canEdit, 
         )}
       </div>
       {value ? (
-        <div className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">{value}</div>
+        <MarkdownViewer content={value} hideToggle className="text-sm" />
       ) : (
         <p className="text-sm text-muted-foreground italic">{placeholder}</p>
       )}
@@ -141,12 +140,14 @@ export default function PostMortemPage() {
       setAddItem({ show: false, title: "", description: "", owner_name: "", priority: "MEDIUM", due_at: "" });
       toast.success("Action item added");
     },
+    onError: () => toast.error("Failed to add action item"),
   });
 
   const updateItemMutation = useMutation({
     mutationFn: ({ itemId, data }: { itemId: string; data: Record<string, unknown> }) =>
       api.patch(`/incidents/${id}/postmortem/action-items/${itemId}`, data),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["postmortem", id] }),
+    onError: () => toast.error("Failed to update action item"),
   });
 
   const deleteItemMutation = useMutation({
@@ -156,6 +157,7 @@ export default function PostMortemPage() {
       qc.invalidateQueries({ queryKey: ["postmortem", id] });
       toast.success("Action item removed");
     },
+    onError: () => toast.error("Failed to remove action item"),
   });
 
   const handleFieldSave = (field: string, value: string) => {
@@ -190,8 +192,12 @@ export default function PostMortemPage() {
   };
 
   const createBlankPM = async () => {
-    await api.put(`/incidents/${id}/postmortem`, {});
-    qc.invalidateQueries({ queryKey: ["postmortem", id] });
+    try {
+      await api.put(`/incidents/${id}/postmortem`, {});
+      qc.invalidateQueries({ queryKey: ["postmortem", id] });
+    } catch {
+      toast.error("Failed to create post-mortem");
+    }
   };
 
   if (isLoading) {
@@ -202,7 +208,20 @@ export default function PostMortemPage() {
     );
   }
 
-  if (!pm || (error as { response?: { status?: number } })?.response?.status === 404) {
+  const httpStatus = (error as { response?: { status?: number } } | null)?.response?.status;
+  if (error && httpStatus !== 404) {
+    return (
+      <div className="p-6 max-w-3xl mx-auto">
+        <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-8 text-center">
+          <AlertTriangle className="h-10 w-10 text-destructive/60 mx-auto mb-3" />
+          <h2 className="text-base font-semibold mb-1">Failed to load post-mortem</h2>
+          <p className="text-sm text-muted-foreground">Check your connection and try refreshing the page.</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!pm) {
     return (
       <div className="p-6 max-w-3xl mx-auto">
         <div className="rounded-xl border border-dashed border-border bg-card p-12 text-center">

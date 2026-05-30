@@ -31,6 +31,8 @@ export default function IncidentLayout({ children }: { children: React.ReactNode
     queryFn: () => api.get<Incident>(`/incidents/${id}`).then((r) => r.data),
   });
 
+  const isExercise = incident?.is_exercise;
+
   const tabs = [
     { href: `/incidents/${id}`, label: "War Room", exact: true },
     { href: `/incidents/${id}/iocs`, label: "IOCs" },
@@ -40,6 +42,8 @@ export default function IncidentLayout({ children }: { children: React.ReactNode
     { href: `/incidents/${id}/comms`, label: "Comms" },
     { href: `/incidents/${id}/timeline`, label: "Timeline" },
     { href: `/incidents/${id}/chat`, label: "Chat" },
+    ...(isExercise ? [{ href: `/incidents/${id}/exercise`, label: "🧪 Exercise" }] : []),
+    { href: `/incidents/${id}/postmortem`, label: "Post-Mortem" },
   ];
 
   return (

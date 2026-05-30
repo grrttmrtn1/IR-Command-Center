@@ -14,6 +14,7 @@ import { Plus, Sparkles, Clock, FileText, CheckSquare, Lock, MessageSquare, Chev
 import { Skeleton } from "@/components/ui/Skeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { RichTextEditor } from "@/components/RichTextEditor";
+import { MarkdownViewer } from "@/components/MarkdownViewer";
 
 const PHASES = [
   "PREPARATION", "DETECTION", "ANALYSIS", "CONTAINMENT",
@@ -500,13 +501,13 @@ export default function WarRoomPage() {
                         {note.is_exec_briefing && <span className="text-xs font-semibold text-purple-600 dark:text-purple-400 flex items-center gap-1"><Sparkles className="h-3 w-3" />Exec Brief</span>}
                         {note.is_pinned && !note.is_exec_briefing && <span className="text-xs text-yellow-600">📌 Pinned</span>}
                       </div>
-                      <p className="text-xs text-foreground whitespace-pre-wrap line-clamp-4">{note.content}</p>
+                      <MarkdownViewer content={note.content} compact hideToggle className="text-xs line-clamp-4" />
                       <p className="text-xs text-muted-foreground mt-1">{timeAgo(note.created_at)}</p>
                     </div>
                   ))}
                   {regularNotes.map((note) => (
                     <div key={note.id} className="px-4 py-3">
-                      <p className="text-xs text-foreground whitespace-pre-wrap line-clamp-3">{note.content}</p>
+                      <MarkdownViewer content={note.content} compact hideToggle className="text-xs line-clamp-3" />
                       <p className="text-xs text-muted-foreground mt-1">{timeAgo(note.created_at)}</p>
                     </div>
                   ))}

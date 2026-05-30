@@ -6,7 +6,7 @@ import Placeholder from "@tiptap/extension-placeholder";
 import { Markdown } from "tiptap-markdown";
 import { cn } from "@/lib/utils";
 import { Bold, Italic, Heading2, List, ListOrdered, Code } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 interface RichTextEditorProps {
   value: string;
@@ -53,6 +53,8 @@ export function RichTextEditor({
   minHeight = "120px",
   disabled = false,
 }: RichTextEditorProps) {
+  const settingContent = useRef(false);
+
   const editor = useEditor({
     extensions: [
       StarterKit,
@@ -62,6 +64,7 @@ export function RichTextEditor({
     content: value,
     editable: !disabled,
     onUpdate({ editor }) {
+      if (settingContent.current) return;
       const md = (editor.storage as unknown as { markdown: { getMarkdown: () => string } }).markdown.getMarkdown();
       onChange(md);
     },
@@ -72,7 +75,9 @@ export function RichTextEditor({
     const storage = editor.storage as unknown as { markdown: { getMarkdown: () => string } };
     const current = storage.markdown.getMarkdown();
     if (current !== value) {
+      settingContent.current = true;
       editor.commands.setContent(value);
+      settingContent.current = false;
     }
   }, [value, editor]);
 
