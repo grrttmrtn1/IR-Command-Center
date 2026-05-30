@@ -8,8 +8,9 @@ import type { IRPlanSection } from "@/lib/types";
 import { toast } from "sonner";
 import {
   FileText, CheckCircle2, AlertTriangle, Clock, Pencil, X,
-  Save, Eye, RotateCcw, ChevronDown, ChevronRight, Shield,
+  Save, RotateCcw, ChevronDown, ChevronRight, Shield,
 } from "lucide-react";
+import { RichTextEditor } from "@/components/RichTextEditor";
 
 function reviewStatus(section: IRPlanSection): "current" | "due" | "overdue" | "unreviewed" {
   if (!section.last_reviewed_at) return "unreviewed";
@@ -90,7 +91,6 @@ function SectionEditor({ section, onClose }: { section: IRPlanSection; onClose: 
   const canReview = hasRole(user, "IR_LEAD");
   const [content, setContent] = useState(section.content ?? "");
   const [title, setTitle] = useState(section.title);
-  const [preview, setPreview] = useState(false);
   const [dirty, setDirty] = useState(false);
 
   const saveMutation = useMutation({
@@ -128,12 +128,6 @@ function SectionEditor({ section, onClose }: { section: IRPlanSection; onClose: 
           />
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <button
-            onClick={() => setPreview(!preview)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors ${preview ? "border-primary text-primary bg-primary/5" : "border-border hover:bg-muted"}`}
-          >
-            <Eye className="h-3.5 w-3.5" /> {preview ? "Edit" : "Preview"}
-          </button>
           {canReview && (
             <button
               onClick={() => reviewMutation.mutate()}
@@ -153,21 +147,15 @@ function SectionEditor({ section, onClose }: { section: IRPlanSection; onClose: 
         </div>
       </div>
 
-      {/* Editor / Preview */}
-      <div className="flex-1 overflow-hidden flex">
-        {preview ? (
-          <div className="flex-1 overflow-y-auto px-8 py-6 max-w-4xl mx-auto w-full">
-            <MarkdownPreview content={content} />
-          </div>
-        ) : (
-          <textarea
-            value={content}
-            onChange={(e) => { setContent(e.target.value); setDirty(true); }}
-            className="flex-1 resize-none px-8 py-6 text-sm font-mono bg-background focus:outline-none leading-relaxed"
-            placeholder="Write this section in Markdown…"
-            spellCheck={false}
-          />
-        )}
+      {/* Editor */}
+      <div className="flex-1 overflow-y-auto px-8 py-6">
+        <RichTextEditor
+          value={content}
+          onChange={(v) => { setContent(v); setDirty(true); }}
+          placeholder="Write this section…"
+          minHeight="calc(100vh - 160px)"
+          className="border-0 rounded-none shadow-none focus-within:ring-0"
+        />
       </div>
 
       {/* Footer status */}

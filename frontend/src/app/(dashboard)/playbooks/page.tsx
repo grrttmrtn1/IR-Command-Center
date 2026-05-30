@@ -11,6 +11,9 @@ import {
   BookOpen, Plus, Pencil, Trash2, X, ChevronDown, ChevronRight,
   Shield, Zap, AlertTriangle, CheckCircle2, Circle, Lock, Play,
 } from "lucide-react";
+import { Skeleton } from "@/components/ui/Skeleton";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { RichTextEditor } from "@/components/RichTextEditor";
 
 const TYPE_LABELS: Record<string, string> = {
   RANSOMWARE: "Ransomware",
@@ -400,12 +403,11 @@ function PlaybookEditor({ initial, onSave, onCancel, isSystem }: {
                   </div>
                   <div>
                     <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1">Description</label>
-                    <textarea
+                    <RichTextEditor
                       value={step.description ?? ""}
-                      onChange={(e) => updateStep(step.id, { description: e.target.value || null })}
-                      rows={3}
-                      className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/40 resize-none"
+                      onChange={(v) => updateStep(step.id, { description: v || null })}
                       placeholder="What to do in this step…"
+                      minHeight="80px"
                     />
                   </div>
                   <label className="flex items-center gap-2 cursor-pointer">
@@ -568,9 +570,19 @@ export default function PlaybooksPage() {
       </div>
 
       {isLoading ? (
-        <div className="text-center py-16 text-muted-foreground">
-          <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent mx-auto mb-2" />
-          <p className="text-sm">Loading playbooks…</p>
+        <div className="space-y-3">
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className="rounded-xl border border-border bg-card p-5 space-y-3">
+              <div className="flex items-start justify-between">
+                <div className="space-y-2 flex-1">
+                  <Skeleton className="h-4 w-20 rounded-full" />
+                  <Skeleton className="h-5 w-64" />
+                  <Skeleton className="h-3 w-48" />
+                </div>
+                <Skeleton className="h-7 w-20 rounded-lg" />
+              </div>
+            </div>
+          ))}
         </div>
       ) : (
         <div className="space-y-6">
@@ -613,10 +625,20 @@ export default function PlaybooksPage() {
           )}
 
           {filtered.length === 0 && (
-            <div className="text-center py-16 border-2 border-dashed border-border rounded-xl">
-              <BookOpen className="h-8 w-8 mx-auto mb-2 text-muted-foreground opacity-50" />
-              <p className="text-muted-foreground text-sm">No playbooks found</p>
-            </div>
+            <EmptyState
+              icon={BookOpen}
+              title="No playbooks found"
+              description={playbooks.length === 0 ? "Create your first response playbook to get started." : "Try adjusting your filter."}
+              action={playbooks.length === 0 && canWrite ? (
+                <button
+                  onClick={() => { setEditingPlaybook(null); setEditIsSystem(false); setShowEditor(true); }}
+                  className="px-4 py-2 bg-primary text-primary-foreground text-sm font-medium rounded-lg hover:bg-primary/90 transition-colors"
+                >
+                  New Playbook
+                </button>
+              ) : undefined}
+              className="border-2 border-dashed border-border rounded-xl py-16"
+            />
           )}
         </div>
       )}

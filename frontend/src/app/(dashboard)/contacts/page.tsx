@@ -10,6 +10,8 @@ import {
   Phone, Mail, Building2, Plus, Pencil, Trash2, X, Users,
   Shield, Calendar, Star, ChevronDown, ChevronRight,
 } from "lucide-react";
+import { Skeleton } from "@/components/ui/Skeleton";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 const CATEGORY_LABELS: Record<ContactCategory, string> = {
   IR_TEAM: "IR Team",
@@ -415,13 +417,30 @@ export default function ContactsPage() {
           </div>
 
           {isLoading ? (
-            <div className="text-center py-12 text-muted-foreground text-sm">Loading contacts…</div>
-          ) : Object.keys(grouped).length === 0 ? (
-            <div className="text-center py-16 border-2 border-dashed border-border rounded-xl">
-              <Users className="h-8 w-8 mx-auto mb-2 text-muted-foreground opacity-40" />
-              <p className="text-muted-foreground text-sm">No contacts found.</p>
-              {canWrite && <button onClick={() => setShowForm(true)} className="mt-2 text-primary text-sm hover:underline">Add the first contact</button>}
+            <div className="grid gap-2 sm:grid-cols-2">
+              {[...Array(6)].map((_, i) => (
+                <div key={i} className="flex items-start gap-3 p-4 rounded-xl border border-border bg-card">
+                  <Skeleton className="h-9 w-9 rounded-full shrink-0" />
+                  <div className="flex-1 space-y-2">
+                    <Skeleton className="h-4 w-32" />
+                    <Skeleton className="h-3 w-24" />
+                    <Skeleton className="h-3 w-36" />
+                  </div>
+                </div>
+              ))}
             </div>
+          ) : Object.keys(grouped).length === 0 ? (
+            <EmptyState
+              icon={Users}
+              title="No contacts found"
+              description="Add your IR team, executives, legal counsel, and retainers."
+              action={canWrite ? (
+                <button onClick={() => setShowForm(true)} className="px-4 py-2 bg-primary text-primary-foreground text-sm font-medium rounded-lg hover:bg-primary/90 transition-colors">
+                  Add First Contact
+                </button>
+              ) : undefined}
+              className="border-2 border-dashed border-border rounded-xl py-16"
+            />
           ) : (
             <div className="space-y-6">
               {(Object.keys(grouped) as ContactCategory[]).map((cat) => (

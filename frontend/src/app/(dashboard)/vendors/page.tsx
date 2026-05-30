@@ -8,6 +8,8 @@ import { formatDate } from "@/lib/utils";
 import type { Vendor, VendorType } from "@/lib/types";
 import { toast } from "sonner";
 import { Building2, Phone, Mail, Clock, AlertTriangle, Plus, Pencil, Trash2, X } from "lucide-react";
+import { Skeleton } from "@/components/ui/Skeleton";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 const TYPE_LABELS: Record<VendorType, string> = {
   LEGAL: "Legal",
@@ -184,15 +186,28 @@ export default function VendorsPage() {
       </div>
 
       {isLoading ? (
-        <div className="flex justify-center py-16">
-          <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[...Array(6)].map((_, i) => (
+            <div key={i} className="rounded-xl border border-border bg-card p-5 space-y-3">
+              <Skeleton className="h-5 w-40" />
+              <Skeleton className="h-4 w-24 rounded-full" />
+              <Skeleton className="h-4 w-32" />
+              <Skeleton className="h-4 w-28" />
+            </div>
+          ))}
         </div>
       ) : filtered.length === 0 ? (
-        <div className="text-center py-16 border border-dashed border-border rounded-xl">
-          <Building2 className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
-          <p className="font-medium">No vendors yet</p>
-          <p className="text-sm text-muted-foreground mt-1">Add your IR retainers, legal counsel, and forensics partners.</p>
-        </div>
+        <EmptyState
+          icon={Building2}
+          title="No vendors yet"
+          description="Add your IR retainers, legal counsel, and forensics partners."
+          action={canWrite ? (
+            <button onClick={openAdd} className="px-4 py-2 bg-primary text-primary-foreground text-sm font-medium rounded-lg hover:bg-primary/90 transition-colors">
+              Add First Vendor
+            </button>
+          ) : undefined}
+          className="border border-dashed border-border rounded-xl py-16"
+        />
       ) : (
         <div className="space-y-8">
           {(Object.entries(grouped) as [VendorType, Vendor[]][]).map(([type, group]) => (

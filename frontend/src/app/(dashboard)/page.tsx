@@ -13,6 +13,8 @@ import {
   AlertTriangle, Shield, Clock, TrendingUp, ArrowRight, Activity,
   CheckSquare, Building2, Brain, MessageSquare, ShieldCheck,
 } from "lucide-react";
+import { Skeleton } from "@/components/ui/Skeleton";
+import { OnboardingChecklist } from "@/components/OnboardingChecklist";
 
 const SEV_COLORS: Record<string, string> = {
   CRITICAL: "#dc2626",
@@ -29,7 +31,7 @@ const ACTIVITY_ICONS: Record<string, string> = {
 export default function HomePage() {
   const { user } = useAuth();
 
-  const { data: summary } = useQuery<MetricsSummary>({
+  const { data: summary, isLoading: summaryLoading } = useQuery<MetricsSummary>({
     queryKey: ["metrics-summary"],
     queryFn: () => api.get<MetricsSummary>("/metrics/summary").then((r) => r.data),
     staleTime: 60_000,
@@ -91,40 +93,52 @@ export default function HomePage() {
 
       {/* Stat cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard
-          label="Open Incidents"
-          value={summary?.open_count ?? "—"}
-          icon={<AlertTriangle className="h-5 w-5" />}
-          iconColor={summary?.open_count ? "text-red-500" : "text-green-500"}
-          accentColor="border-t-red-500"
-          href="/incidents"
-        />
-        <StatCard
-          label="Critical"
-          value={summary?.critical_count ?? "—"}
-          icon={<Shield className="h-5 w-5" />}
-          iconColor={summary?.critical_count ? "text-red-600" : "text-green-500"}
-          accentColor="border-t-red-600"
-          href="/incidents"
-        />
-        <StatCard
-          label="MTTD"
-          value={mttdStr}
-          icon={<Clock className="h-5 w-5" />}
-          iconColor="text-blue-500"
-          accentColor="border-t-blue-500"
-          href="/incidents"
-          subtitle="detection"
-        />
-        <StatCard
-          label="MTTR"
-          value={mttrStr}
-          icon={<TrendingUp className="h-5 w-5" />}
-          iconColor="text-purple-500"
-          accentColor="border-t-purple-500"
-          href="/incidents"
-          subtitle="resolution"
-        />
+        {summaryLoading ? (
+          [...Array(4)].map((_, i) => (
+            <div key={i} className="rounded-xl border border-border border-t-2 border-t-muted bg-card p-5 shadow-sm">
+              <Skeleton className="h-5 w-5 mb-3" />
+              <Skeleton className="h-7 w-16 mb-2" />
+              <Skeleton className="h-4 w-24" />
+            </div>
+          ))
+        ) : (
+          <>
+            <StatCard
+              label="Open Incidents"
+              value={summary?.open_count ?? "—"}
+              icon={<AlertTriangle className="h-5 w-5" />}
+              iconColor={summary?.open_count ? "text-red-500" : "text-green-500"}
+              accentColor="border-t-red-500"
+              href="/incidents"
+            />
+            <StatCard
+              label="Critical"
+              value={summary?.critical_count ?? "—"}
+              icon={<Shield className="h-5 w-5" />}
+              iconColor={summary?.critical_count ? "text-red-600" : "text-green-500"}
+              accentColor="border-t-red-600"
+              href="/incidents"
+            />
+            <StatCard
+              label="MTTD"
+              value={mttdStr}
+              icon={<Clock className="h-5 w-5" />}
+              iconColor="text-blue-500"
+              accentColor="border-t-blue-500"
+              href="/incidents"
+              subtitle="detection"
+            />
+            <StatCard
+              label="MTTR"
+              value={mttrStr}
+              icon={<TrendingUp className="h-5 w-5" />}
+              iconColor="text-purple-500"
+              accentColor="border-t-purple-500"
+              href="/incidents"
+              subtitle="resolution"
+            />
+          </>
+        )}
       </div>
 
       {/* Charts row */}
@@ -284,6 +298,9 @@ export default function HomePage() {
           </div>
         </Link>
       )}
+
+      {/* Onboarding checklist */}
+      <OnboardingChecklist />
 
       {/* Quick Actions */}
       <div>

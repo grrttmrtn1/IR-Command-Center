@@ -7,6 +7,7 @@ import type { Document } from "@/lib/types";
 import { toast } from "sonner";
 import { Plus, Search, FileText, Trash2 } from "lucide-react";
 import { MarkdownViewer } from "@/components/MarkdownViewer";
+import { RichTextEditor } from "@/components/RichTextEditor";
 
 const CATEGORIES = ["PLAYBOOK", "PROCEDURE", "POLICY", "TEMPLATE", "EVIDENCE", "LEGAL", "COMMUNICATION", "TRAINING", "OTHER"];
 
@@ -16,7 +17,6 @@ export default function DocumentsPage() {
   const [category, setCategory] = useState("");
   const [isTemplate, setIsTemplate] = useState<boolean | null>(null);
   const [selected, setSelected] = useState<Document | null>(null);
-  const [previewMode, setPreviewMode] = useState(false);
   const [creating, setCreating] = useState(false);
   const [newDoc, setNewDoc] = useState({ title: "", category: "PLAYBOOK", content: "", is_template: false });
 
@@ -173,12 +173,11 @@ export default function DocumentsPage() {
                     Template
                   </label>
                 </div>
-                <textarea
+                <RichTextEditor
                   value={newDoc.content}
-                  onChange={(e) => setNewDoc({ ...newDoc, content: e.target.value })}
-                  rows={20}
-                  placeholder="Document content (Markdown supported)..."
-                  className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background font-mono focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+                  onChange={(v) => setNewDoc({ ...newDoc, content: v })}
+                  placeholder="Document content…"
+                  minHeight="400px"
                 />
                 <div className="flex gap-2">
                   <button
@@ -201,14 +200,6 @@ export default function DocumentsPage() {
                 </div>
                 <div className="flex items-center gap-2">
                   {!selected.is_system_template && (
-                    <button
-                      onClick={() => setPreviewMode(!previewMode)}
-                      className="px-3 py-1.5 border border-border text-xs rounded-lg hover:bg-muted transition-colors"
-                    >
-                      {previewMode ? "Edit" : "Preview"}
-                    </button>
-                  )}
-                  {!selected.is_system_template && !previewMode && (
                     <button
                       onClick={() => updateMutation.mutate({ id: selected.id, content: selected.content ?? "" })}
                       disabled={updateMutation.isPending}
@@ -236,18 +227,12 @@ export default function DocumentsPage() {
               <div className="p-5">
                 {selected.is_system_template ? (
                   <MarkdownViewer content={selected.content ?? ""} defaultRaw={false} />
-                ) : previewMode ? (
-                  <MarkdownViewer
-                    content={selected.content ?? ""}
-                    defaultRaw={false}
-                    className="min-h-[400px]"
-                  />
                 ) : (
-                  <textarea
+                  <RichTextEditor
                     value={selected.content ?? ""}
-                    onChange={(e) => setSelected({ ...selected, content: e.target.value })}
-                    rows={24}
-                    className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background font-mono focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+                    onChange={(v) => setSelected({ ...selected, content: v })}
+                    placeholder="Document content…"
+                    minHeight="480px"
                   />
                 )}
               </div>
