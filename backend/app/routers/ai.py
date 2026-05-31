@@ -224,3 +224,180 @@ Provide: (1) Top 5 priority remediation items, (2) Quick wins achievable in 30 d
         temperature=0.4,
     )
     return {"analysis": response.content, "assessment_id": assessment_id}
+
+
+class GeneratePostMortemRequest(BaseModel):
+    incident_id: str
+    provider: str | None = None
+
+
+class GenerateExerciseInjectsRequest(BaseModel):
+    incident_id: str
+    incident_type: str
+    current_phase: str
+    scenario_context: str | None = None
+    count: int = 5
+    provider: str | None = None
+
+
+@router.post("/generate-postmortem")
+async def generate_postmortem(
+    body: GeneratePostMortemRequest,
+    user: User = Depends(require_role(UserRole.IR_LEAD)),
+    db: AsyncSession = Depends(get_db),
+):
+    from app.models.incident import Incident, TimelineEvent, IncidentNote
+    from sqlalchemy.orm import selectinload
+
+    result = await db.execute(
+        select(Incident)
+        .options(
+            selectinload(Incident.timeline_events),
+            selectinload(Incident.notes),
+            selectinload(Incident.tasks),
+            selectinload(Incident.iocs),
+        )
+        .where(Incident.id == body.incident_id)
+    )
+    incident = result.scalar_one_or_none()
+    if not incident:
+        raise HTTPException(status_code=404, detail="Incident not found")
+
+    duration_hours = None
+    if incident.resolved_at:
+        delta = incident.resolved_at - incident.started_at
+        duration_hours = round(delta.total_seconds() / 3600, 1)
+
+    timeline_text = "\n".join([
+        f"- [{e.occurred_at.strftime('%Y-%m-%d %H:%M')}] {e.event_type}: {e.description}"
+        for e in sorted(incident.timeline_events, key=lambda x: x.occurred_at)[:25]
+    ]) or "No timeline events recorded."
+
+    tasks_done = [t for t in incident.tasks if t.status == "DONE"]
+    tasks_open = [t for t in incident.tasks if t.status != "DONE"]
+    ioc_count = len(incident.iocs)
+
+    prompt = f"""You are preparing a blameless post-mortem for the following security incident. Generate a structured, honest, and actionable post-mortem draft. Use markdown formatting in each section.
+
+INCIDENT DETAILS:
+- Title: {incident.title}
+- Type: {incident.incident_type}
+- Severity: {incident.severity}
+- Status: {incident.status}
+- Started: {incident.started_at.strftime('%Y-%m-%d %H:%M UTC')}
+{"- Resolved: " + incident.resolved_at.strftime('%Y-%m-%d %H:%M UTC') if incident.resolved_at else "- Status: Not yet resolved"}
+{"- Duration: " + str(duration_hours) + " hours" if duration_hours else ""}
+- IOCs documented: {ioc_count}
+- Tasks completed: {len(tasks_done)} / {len(incident.tasks)}
+- Open tasks remaining: {len(tasks_open)}
+{f"- Description: {incident.description}" if incident.description else ""}
+
+TIMELINE:
+{timeline_text}
+
+Generate a post-mortem with these exact sections. Be specific, honest, and blameless. Use bullet points where appropriate.
+
+1. SUMMARY (2-3 sentences: what happened, how it was detected, how it was resolved)
+2. IMPACT (business and technical impact: systems affected, data at risk, downtime, etc.)
+3. TIMELINE_NOTES (key observations about the response timeline: what was fast, what was slow)
+4. WHAT_WENT_WELL (specific things the team did well — minimum 3 items)
+5. WHAT_WENT_POORLY (specific gaps or failures — minimum 3 items, be direct)
+6. ROOT_CAUSE (the actual root cause, not symptoms)
+7. FIVE_WHYS (5 why iterations drilling into root cause — return as a numbered list "Why 1: ... Answer: ...")
+8. LESSONS_LEARNED (3-5 actionable takeaways that will prevent recurrence or improve response)
+
+Return ONLY a JSON object with keys: summary, impact, timeline_notes, what_went_well, what_went_poorly, root_cause, five_whys_text, lessons_learned. No other text."""
+
+    provider = await _get_provider_from_db(db, body.provider)
+    response = await provider.generate(
+        [AIMessage(role="user", content=prompt)],
+        system="You are a senior incident responder writing a blameless post-mortem. Be specific, honest, and constructive.",
+        max_tokens=3000,
+        temperature=0.4,
+    )
+
+    import json
+    content = response.content.strip()
+    if content.startswith("```"):
+        content = content.split("```")[1]
+        if content.startswith("json"):
+            content = content[4:]
+    content = content.strip()
+
+    try:
+        parsed = json.loads(content)
+    except Exception:
+        return {"raw": response.content, "parse_error": True}
+
+    five_whys_raw = parsed.get("five_whys_text", "")
+    five_whys = []
+    if five_whys_raw:
+        for line in five_whys_raw.split("\n"):
+            line = line.strip()
+            if line.startswith("Why") and "Answer:" in line:
+                parts = line.split("Answer:")
+                five_whys.append({"why": parts[0].strip().lstrip("1234567890. ").strip(), "answer": parts[1].strip()})
+
+    return {
+        "summary": parsed.get("summary", ""),
+        "impact": parsed.get("impact", ""),
+        "timeline_notes": parsed.get("timeline_notes", ""),
+        "what_went_well": parsed.get("what_went_well", ""),
+        "what_went_poorly": parsed.get("what_went_poorly", ""),
+        "root_cause": parsed.get("root_cause", ""),
+        "five_whys": five_whys,
+        "lessons_learned": parsed.get("lessons_learned", ""),
+        "provider": response.provider,
+    }
+
+
+@router.post("/generate-exercise-injects")
+async def generate_exercise_injects(
+    body: GenerateExerciseInjectsRequest,
+    user: User = Depends(require_role(UserRole.ANALYST)),
+    db: AsyncSession = Depends(get_db),
+):
+    INJECT_TYPES = ["TECHNICAL", "COMMUNICATION", "ESCALATION", "DECISION", "COMPLICATION"]
+
+    prompt = f"""You are a tabletop exercise facilitator. Generate realistic, challenging scenario injects for a cybersecurity tabletop exercise.
+
+Incident type: {body.incident_type}
+Current phase: {body.current_phase}
+{f"Additional context: {body.scenario_context}" if body.scenario_context else ""}
+
+Generate exactly {body.count} scenario injects. Each inject should:
+- Be realistic and plausible for the incident type
+- Force a decision, reveal a gap, or escalate pressure on the team
+- Cover a mix of categories: TECHNICAL (new technical finding), COMMUNICATION (external party, media, regulator), ESCALATION (leadership/board pressure), DECISION (forcing a hard choice), COMPLICATION (something that makes the situation harder)
+- Be specific and concrete, not vague
+
+Return ONLY a JSON array of objects with fields:
+- title: short descriptive title (max 60 chars)
+- description: the inject text read to the team (2-4 sentences, written as a present-tense scenario update)
+- inject_type: one of TECHNICAL|COMMUNICATION|ESCALATION|DECISION|COMPLICATION
+- facilitator_notes: private guidance for the facilitator (what to watch for, expected responses, follow-up probes)
+
+No other text."""
+
+    provider = await _get_provider_from_db(db, body.provider)
+    response = await provider.generate(
+        [AIMessage(role="user", content=prompt)],
+        system="You are an expert tabletop exercise facilitator who creates realistic, high-pressure injects that expose gaps in IR processes.",
+        max_tokens=2500,
+        temperature=0.8,
+    )
+
+    import json
+    content = response.content.strip()
+    if content.startswith("```"):
+        content = content.split("```")[1]
+        if content.startswith("json"):
+            content = content[4:]
+    content = content.strip()
+
+    try:
+        injects = json.loads(content)
+    except Exception:
+        injects = [{"title": "Review AI output", "description": response.content, "inject_type": "COMPLICATION", "facilitator_notes": "JSON parsing failed — review raw output."}]
+
+    return {"injects": injects, "provider": response.provider}

@@ -10,23 +10,26 @@ interface MarkdownViewerProps {
   className?: string;
   defaultRaw?: boolean;
   compact?: boolean;
+  hideToggle?: boolean;
 }
 
-export function MarkdownViewer({ content, className = "", defaultRaw = false, compact = false }: MarkdownViewerProps) {
+export function MarkdownViewer({ content, className = "", defaultRaw = false, compact = false, hideToggle = false }: MarkdownViewerProps) {
   const [raw, setRaw] = useState(defaultRaw);
 
   return (
     <div className={className}>
-      <div className="flex justify-end mb-2">
-        <button
-          onClick={() => setRaw(!raw)}
-          className="flex items-center gap-1 px-2 py-1 text-xs text-muted-foreground hover:text-foreground border border-border rounded transition-colors"
-          title={raw ? "Show rendered view" : "Show raw markdown"}
-        >
-          {raw ? <Eye className="h-3 w-3" /> : <Code className="h-3 w-3" />}
-          {raw ? "Preview" : "Raw"}
-        </button>
-      </div>
+      {!hideToggle && (
+        <div className="flex justify-end mb-2">
+          <button
+            onClick={() => setRaw(!raw)}
+            className="flex items-center gap-1 px-2 py-1 text-xs text-muted-foreground hover:text-foreground border border-border rounded transition-colors"
+            title={raw ? "Show rendered view" : "Show raw markdown"}
+          >
+            {raw ? <Eye className="h-3 w-3" /> : <Code className="h-3 w-3" />}
+            {raw ? "Preview" : "Raw"}
+          </button>
+        </div>
+      )}
       {raw ? (
         <pre className={`whitespace-pre-wrap font-mono text-sm text-foreground bg-muted/30 rounded-lg p-3 ${compact ? "max-h-64 overflow-y-auto" : ""}`}>
           {content}

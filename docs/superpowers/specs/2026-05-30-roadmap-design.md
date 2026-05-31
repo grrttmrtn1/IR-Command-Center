@@ -235,7 +235,7 @@ Uses the existing `scheduler.py` (APScheduler) and `report_generator.py` infrast
 - Tiptap replaces raw `<textarea>` inputs — a shared `RichTextEditor.tsx` component wraps Tiptap with a consistent toolbar
 - The command palette lives at `frontend/src/components/CommandPalette.tsx`, mounted in the root dashboard layout
 - Skeleton loaders use a shared `Skeleton.tsx` component (simple `animate-pulse` div)
-- SLA thresholds stored as a JSON column on a new `org_settings` table (or extended onto `AIConfig` if scope is kept minimal)
+- SLA thresholds stored as a JSON column on a new `org_settings` table (separate from `AIConfig` — org settings are distinct from AI provider config)
 
 ---
 

@@ -7,7 +7,7 @@ from app.config import settings
 from app.middleware.audit import AuditMiddleware
 from app.routers import auth, incidents, tasks, documents, scorecard, communications, ai, knowledge, admin, audit, ransomware, v1
 from app.routers import task_templates, notifications, search, metrics, vendors, chat, warroom_ws, compliance, reports
-from app.routers import playbooks, irplan, readiness
+from app.routers import playbooks, irplan, readiness, postmortem, exercise
 
 from contextlib import asynccontextmanager
 
@@ -109,6 +109,8 @@ app.include_router(reports.router)
 app.include_router(playbooks.router)
 app.include_router(irplan.router)
 app.include_router(readiness.router)
+app.include_router(postmortem.router)
+app.include_router(exercise.router)
 
 
 @app.get("/redoc", include_in_schema=False)

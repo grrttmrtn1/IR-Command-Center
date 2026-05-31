@@ -138,3 +138,23 @@
   .stagger-3 { animation-delay: 150ms; }
   .stagger-4 { animation-delay: 200ms; }
 }
+
+/* ── Tiptap rich text editor ─────────────────────────────────── */
+.tiptap p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: hsl(var(--muted-foreground));
+  pointer-events: none;
+  height: 0;
+}
+
+.tiptap:focus { outline: none; }
+
+.tiptap h2 { @apply text-base font-bold mt-3 mb-1; }
+.tiptap h3 { @apply text-sm font-semibold mt-2 mb-1; }
+.tiptap ul  { @apply list-disc list-inside space-y-0.5 my-1 text-sm; }
+.tiptap ol  { @apply list-decimal list-inside space-y-0.5 my-1 text-sm; }
+.tiptap code { @apply bg-muted text-foreground px-1 py-0.5 rounded text-xs font-mono; }
+.tiptap pre  { @apply bg-muted rounded-md p-3 my-2 text-xs font-mono overflow-x-auto; }
+.tiptap pre code { @apply bg-transparent p-0; }
+.tiptap blockquote { @apply border-l-2 border-primary/40 pl-3 text-muted-foreground italic my-2; }

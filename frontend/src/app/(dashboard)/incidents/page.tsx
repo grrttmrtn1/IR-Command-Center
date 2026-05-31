@@ -9,6 +9,8 @@ import { SEVERITY_COLORS, STATUS_COLORS, INCIDENT_TYPE_LABELS, formatDate } from
 import { useAuth, hasRole } from "@/lib/auth";
 import { Plus, Search, AlertTriangle, XCircle, Trash2, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
+import { Skeleton } from "@/components/ui/Skeleton";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 const PHASES = [
   "PREPARATION", "DETECTION", "ANALYSIS", "CONTAINMENT",
@@ -125,28 +127,45 @@ export default function IncidentsPage() {
       </div>
 
       {isLoading ? (
-        <div className="flex justify-center py-20">
-          <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+        <div className="rounded-xl border border-border overflow-hidden shadow-sm">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border bg-muted/40">
+                {["Severity", "Title", "Type", "Status", "Phase", "Started"].map((h) => (
+                  <th key={h} className="px-4 py-3 text-left"><Skeleton className="h-3 w-14" /></th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="bg-card divide-y divide-border">
+              {[...Array(5)].map((_, i) => (
+                <tr key={i}>
+                  <td className="px-4 py-3.5"><Skeleton className="h-5 w-16 rounded-md" /></td>
+                  <td className="px-4 py-3.5"><Skeleton className="h-4 w-48" /></td>
+                  <td className="px-4 py-3.5"><Skeleton className="h-4 w-24" /></td>
+                  <td className="px-4 py-3.5"><Skeleton className="h-5 w-20 rounded-md" /></td>
+                  <td className="px-4 py-3.5"><Skeleton className="h-4 w-24" /></td>
+                  <td className="px-4 py-3.5"><Skeleton className="h-4 w-16" /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       ) : filtered.length === 0 ? (
-        <div className="text-center py-20 border border-dashed border-border rounded-xl bg-muted/20">
-          <div className="h-14 w-14 rounded-full bg-muted flex items-center justify-center mx-auto mb-4">
-            <AlertTriangle className="h-7 w-7 text-muted-foreground" />
-          </div>
-          <p className="font-semibold text-foreground">No incidents found</p>
-          <p className="text-sm text-muted-foreground mt-1">
-            {incidents.length === 0 ? "Declare a new incident to get started." : "Try adjusting your filters."}
-          </p>
-          {incidents.length === 0 && canAnalyst && (
+        <EmptyState
+          icon={AlertTriangle}
+          title="No incidents found"
+          description={incidents.length === 0 ? "Declare a new incident to get started." : "Try adjusting your filters."}
+          action={incidents.length === 0 && canAnalyst ? (
             <Link
               href="/incidents/new"
-              className="inline-flex items-center gap-2 mt-4 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors"
             >
               <Plus className="h-4 w-4" />
               Declare Incident
             </Link>
-          )}
-        </div>
+          ) : undefined}
+          className="border border-dashed border-border rounded-xl bg-muted/20 py-20"
+        />
       ) : (
         <div className="rounded-xl border border-border overflow-hidden shadow-sm">
           <table className="w-full text-sm">

@@ -10,7 +10,11 @@ import { SEVERITY_COLORS, IOC_TYPE_ICONS, formatDate, timeAgo } from "@/lib/util
 import { useAuth, hasRole } from "@/lib/auth";
 import { toast } from "sonner";
 import { useWarRoomWS } from "@/lib/useWarRoomWS";
-import { Plus, Sparkles, Clock, FileText, CheckSquare, Lock, MessageSquare, ChevronDown, XCircle, Trash2, Download, Wifi, WifiOff } from "lucide-react";
+import { Plus, Sparkles, Clock, FileText, CheckSquare, Lock, MessageSquare, ChevronDown, XCircle, Trash2, Download, Wifi, WifiOff, Shield, StickyNote } from "lucide-react";
+import { Skeleton } from "@/components/ui/Skeleton";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { RichTextEditor } from "@/components/RichTextEditor";
+import { MarkdownViewer } from "@/components/MarkdownViewer";
 
 const PHASES = [
   "PREPARATION", "DETECTION", "ANALYSIS", "CONTAINMENT",
@@ -151,7 +155,37 @@ export default function WarRoomPage() {
   };
 
   if (isLoading || !incident) {
-    return <div className="flex justify-center py-20"><div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" /></div>;
+    return (
+      <div className="p-6 max-w-7xl mx-auto">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <Skeleton className="h-6 w-16 rounded-md" />
+            <Skeleton className="h-4 w-24" />
+            <Skeleton className="h-6 w-20 rounded-md" />
+            <Skeleton className="h-4 w-24" />
+          </div>
+          <div className="flex items-center gap-2">
+            <Skeleton className="h-9 w-28 rounded-lg" />
+            <Skeleton className="h-9 w-28 rounded-lg" />
+          </div>
+        </div>
+        <div className="flex items-center gap-1 mb-6">
+          {[...Array(7)].map((_, i) => <Skeleton key={i} className="h-6 w-20 rounded" />)}
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className="rounded-xl border border-border bg-card">
+              <div className="px-4 py-3 border-b border-border">
+                <Skeleton className="h-4 w-36" />
+              </div>
+              <div className="p-4 space-y-3">
+                {[...Array(4)].map((_, j) => <Skeleton key={j} className="h-10 w-full rounded-lg" />)}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
   }
 
   const elapsed = Math.round((Date.now() - new Date(incident.started_at).getTime()) / 3600000);
@@ -344,7 +378,7 @@ export default function WarRoomPage() {
 
             <div className="divide-y divide-border max-h-72 overflow-y-auto">
               {iocs.length === 0 ? (
-                <p className="text-xs text-muted-foreground text-center py-6">No IOCs documented</p>
+                <EmptyState icon={Shield} title="No IOCs documented" className="py-6" />
               ) : iocs.map((ioc) => (
                 <div key={ioc.id} className="px-4 py-2.5 flex items-start gap-2">
                   <span className="text-sm shrink-0 mt-0.5">{IOC_TYPE_ICONS[ioc.type] ?? "❓"}</span>
@@ -409,7 +443,7 @@ export default function WarRoomPage() {
 
             <div className="divide-y divide-border max-h-72 overflow-y-auto">
               {assets.length === 0 ? (
-                <p className="text-xs text-muted-foreground text-center py-6">No assets documented</p>
+                <EmptyState icon={CheckSquare} title="No assets documented" className="py-6" />
               ) : assets.map((asset) => (
                 <div key={asset.id} className="px-4 py-2.5">
                   <div className="flex items-center justify-between">
@@ -437,12 +471,11 @@ export default function WarRoomPage() {
 
             {addNote.show && (
               <div className="p-3 border-b border-border bg-muted/30 space-y-2">
-                <textarea
+                <RichTextEditor
                   value={addNote.content}
-                  onChange={(e) => setAddNote({ ...addNote, content: e.target.value })}
-                  placeholder="Add a note... (supports markdown)"
-                  rows={3}
-                  className="w-full px-2 py-1.5 text-xs border border-border rounded-md bg-background resize-none"
+                  onChange={(v) => setAddNote({ ...addNote, content: v })}
+                  placeholder="Add a note…"
+                  minHeight="80px"
                 />
                 <div className="flex gap-2">
                   <button
@@ -459,7 +492,7 @@ export default function WarRoomPage() {
 
             <div className="divide-y divide-border max-h-80 overflow-y-auto">
               {notes.length === 0 ? (
-                <p className="text-xs text-muted-foreground text-center py-6">No notes yet</p>
+                <EmptyState icon={StickyNote} title="No notes yet" className="py-6" />
               ) : (
                 <>
                   {pinnedNotes.map((note) => (
@@ -468,13 +501,13 @@ export default function WarRoomPage() {
                         {note.is_exec_briefing && <span className="text-xs font-semibold text-purple-600 dark:text-purple-400 flex items-center gap-1"><Sparkles className="h-3 w-3" />Exec Brief</span>}
                         {note.is_pinned && !note.is_exec_briefing && <span className="text-xs text-yellow-600">📌 Pinned</span>}
                       </div>
-                      <p className="text-xs text-foreground whitespace-pre-wrap line-clamp-4">{note.content}</p>
+                      <MarkdownViewer content={note.content} compact hideToggle className="text-xs line-clamp-4" />
                       <p className="text-xs text-muted-foreground mt-1">{timeAgo(note.created_at)}</p>
                     </div>
                   ))}
                   {regularNotes.map((note) => (
                     <div key={note.id} className="px-4 py-3">
-                      <p className="text-xs text-foreground whitespace-pre-wrap line-clamp-3">{note.content}</p>
+                      <MarkdownViewer content={note.content} compact hideToggle className="text-xs line-clamp-3" />
                       <p className="text-xs text-muted-foreground mt-1">{timeAgo(note.created_at)}</p>
                     </div>
                   ))}
